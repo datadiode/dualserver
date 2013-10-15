@@ -27,7 +27,7 @@
 #include <limits.h>
 #include <iphlpapi.h>
 #include <process.h>
-#include <math.h>
+#include <assert.h>
 #include "PunyConvert.h"
 #include "LeakDetector.h"
 #include "DualServer.h"
@@ -4887,7 +4887,7 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 			continue;
 		}
 
-		unsigned long j;
+		unsigned long j = 0;
 
 		size_t len = strlen(value);
 		if (len == 0)
@@ -5031,12 +5031,9 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 			continue;
 		}
 
-		MYBYTE opTag = op->opTag;
-		MYBYTE opType = op->opType;
-
-		if (!opType)
-			opType = valType;
-
+		const MYBYTE opTag = op->opTag;
+		const MYBYTE opType = op->opType;
+		assert(opType);
 		//sprintf(logBuff, "Tag %i ValType %i opType %i value=%s size=%u", opTag, valType, opType, value, valSize);
 		//logDHCPMess(logBuff, 1);
 
@@ -5149,146 +5146,121 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 			break;
 
 		case 4:
+			if (valType == 2 && valSize == 4)
+				j = fULong(value);
+			else if (valType < 4 || valType > 6)
 			{
-				MYDWORD j;
+				sprintf(logBuff, "Warning: section [%s] option %s, value should be integer between 0 & %u or 4 bytes, option ignored", sectionName, name, UINT_MAX);
+				logDHCPMess(logBuff, 1);
+				continue;
+			}
 
-				if (valType == 2 && valSize == 4)
-					j = fULong(value);
-				else if (valType >= 4 && valType <= 6)
-					j = atol(value);
-				else
+			if (opTag == DHCP_OPTION_IPADDRLEASE)
+			{
+				if (j == 0)
+					j = UINT_MAX;
+
+				if (!strcasecmp(sectionName, GLOBALOPTIONS))
 				{
-					sprintf(logBuff, "Warning: section [%s] option %s, value should be integer between 0 & %u or 4 bytes, option ignored", sectionName, name, UINT_MAX);
+					sprintf(logBuff, "Warning: section [%s] option %s not allowed in this section, please set it in [TIMINGS] section", sectionName, raw);
 					logDHCPMess(logBuff, 1);
 					continue;
 				}
-
-				if (opTag == DHCP_OPTION_IPADDRLEASE)
+				else if (j > cfig.lease)
 				{
-					if (j == 0)
-						j = UINT_MAX;
-
-					if (!strcasecmp(sectionName, GLOBALOPTIONS))
-					{
-						sprintf(logBuff, "Warning: section [%s] option %s not allowed in this section, please set it in [TIMINGS] section", sectionName, raw);
-						logDHCPMess(logBuff, 1);
-						continue;
-					}
-					else if (j > cfig.lease)
-					{
-						sprintf(logBuff, "Warning: section [%s] option %s value should be less then %u (max lease), ignored", sectionName, name, cfig.lease);
-						logDHCPMess(logBuff, 1);
-						continue;
-					}
-				}
-
-				if (buffsize > 6)
-				{
-					*dp++ = opTag;
-					*dp++ = 4;
-					dp += pULong(dp, j);
-					buffsize -= 6;
-					//printf("%s=%u=%u\n",opData[op_index].opName,opData[op_index].opType,htonl(j));
-				}
-				else
-				{
-					sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
+					sprintf(logBuff, "Warning: section [%s] option %s value should be less then %u (max lease), ignored", sectionName, name, cfig.lease);
 					logDHCPMess(logBuff, 1);
+					continue;
 				}
+			}
+
+			if (buffsize > 6)
+			{
+				*dp++ = opTag;
+				*dp++ = 4;
+				dp += pULong(dp, j);
+				buffsize -= 6;
+				//printf("%s=%u=%u\n",opData[op_index].opName,opData[op_index].opType,htonl(j));
+			}
+			else
+			{
+				sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
+				logDHCPMess(logBuff, 1);
 			}
 			break;
 
 		case 5:
+			if (valType == 2 && valSize == 2)
+				j = fUShort(value);
+			else if (valType < 5 || valType > 6)
 			{
-				MYWORD j;
+				sprintf(logBuff, "Warning: section [%s] option %s, value should be between 0 & %u or 2 bytes, option ignored", sectionName, name, USHRT_MAX);
+				logDHCPMess(logBuff, 1);
+				continue;
+			}
 
-				if (valType == 2 && valSize == 2)
-					j = fUShort(value);
-				else if (valType == 5 || valType == 6)
-					j = static_cast<MYWORD>(atol(value));
-				else
-				{
-					sprintf(logBuff, "Warning: section [%s] option %s, value should be between 0 & %u or 2 bytes, option ignored", sectionName, name, USHRT_MAX);
-					logDHCPMess(logBuff, 1);
-					continue;
-				}
-
-				if (buffsize > 4)
-				{
-					*dp++ = opTag;
-					*dp++ = 2;
-					dp += pUShort(dp, j);
-					buffsize -= 4;
-				}
-				else
-				{
-					sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
-					logDHCPMess(logBuff, 1);
-				}
+			if (buffsize > 4)
+			{
+				*dp++ = opTag;
+				*dp++ = 2;
+				dp += pUShort(dp, static_cast<MYWORD>(j));
+				buffsize -= 4;
+			}
+			else
+			{
+				sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
+				logDHCPMess(logBuff, 1);
 			}
 			break;
 
 		case 6:
+			if (valType == 2 && valSize == 1)
+				j = *value;
+			else if (valType != 6)
 			{
-				MYBYTE j;
-
-				if (valType == 2 && valSize == 1)
-					j = *value;
-				else if (valType == 6)
-					j = static_cast<MYBYTE>(atol(value));
-				else
-				{
-					sprintf(logBuff, "Warning: section [%s] option %s, value should be between 0 & %u or single byte, option ignored", sectionName, name, UCHAR_MAX);
-					logDHCPMess(logBuff, 1);
-					continue;
-				}
-
-				if (buffsize > 3)
-				{
-					*dp++ = opTag;
-					*dp++ = 1;
-					*dp++ = j;
-					buffsize -= 3;
-				}
-				else
-				{
-					sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
-					logDHCPMess(logBuff, 1);
-				}
+				sprintf(logBuff, "Warning: section [%s] option %s, value should be between 0 & %u or single byte, option ignored", sectionName, name, UCHAR_MAX);
+				logDHCPMess(logBuff, 1);
+				continue;
 			}
-			break;
+
+			if (buffsize > 3)
+			{
+				*dp++ = opTag;
+				*dp++ = 1;
+				*dp++ = static_cast<MYBYTE>(j);
+				buffsize -= 3;
+			}
+			else
+			{
+				sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
+				logDHCPMess(logBuff, 1);
+			}
 
 		case 7:
+			if (valType == 2 && valSize == 1 && *value < 2)
+				j = *value;
+			else if (valType == 1 && (!strcasecmp(value, "yes") || !strcasecmp(value, "on") || !strcasecmp(value, "true")))
+				j = 1;
+			else if (valType == 1 && (!strcasecmp(value, "no") || !strcasecmp(value, "off") || !strcasecmp(value, "false")))
+				j = 0;
+			else if (valType != 6 || j > 1)
 			{
-				MYBYTE j;
+				sprintf(logBuff, "Warning: section [%s] option %s, value should be yes/on/true/1 or no/off/false/0, option ignored", sectionName, raw);
+				logDHCPMess(logBuff, 1);
+				continue;
+			}
 
-				if (valType == 2 && valSize == 1 && *value < 2)
-					j = *value;
-				else if (valType == 1 && (!strcasecmp(value, "yes") || !strcasecmp(value, "on") || !strcasecmp(value, "true")))
-					j = 1;
-				else if (valType == 1 && (!strcasecmp(value, "no") || !strcasecmp(value, "off") || !strcasecmp(value, "false")))
-					j = 0;
-				else if (valType == 6 && atoi(value) < 2)
-					j = static_cast<char>(atoi(value));
-				else
-				{
-					sprintf(logBuff, "Warning: section [%s] option %s, value should be yes/on/true/1 or no/off/false/0, option ignored", sectionName, raw);
-					logDHCPMess(logBuff, 1);
-					continue;
-				}
-
-				if (buffsize > 3)
-				{
-					*dp++ = opTag;
-					*dp++ = 1;
-					*dp++ = j;
-					buffsize -= 3;
-				}
-				else
-				{
-					sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
-					logDHCPMess(logBuff, 1);
-				}
+			if (buffsize > 3)
+			{
+				*dp++ = opTag;
+				*dp++ = 1;
+				*dp++ = static_cast<MYBYTE>(j);
+				buffsize -= 3;
+			}
+			else
+			{
+				sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
+				logDHCPMess(logBuff, 1);
 			}
 			break;
 
@@ -7671,7 +7643,7 @@ int runProg()
 	if (dnsService)
 	{
 		if (cfig.dnsLogLevel == 3)
-			sprintf(logBuff, "DNS Logging: All");
+			sprintf(logBuff, "DNS Logging: Debug");
 		else if (cfig.dnsLogLevel == 2)
 			sprintf(logBuff, "DNS Logging: All");
 		else if (cfig.dnsLogLevel == 1)
