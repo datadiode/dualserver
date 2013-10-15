@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<VisualStudioToolFile
+	Name="Custom Build Rules"
+	Version="8,00"
+	>
+	<Rules>
+		<CustomBuildRule
+			Name="CopyDeployFiles"
+			CommandLine="copy /Y &quot;$(InputPath)&quot; &quot;$(OutDir)\$(InputName)&quot;"
+			Outputs="&quot;$(OutDir)\$(InputName)&quot;"
+			FileExtensions="*.CopyDeploy"
+			>
+		</CustomBuildRule>
+		<CustomBuildRule
+			Name="CopyDeployFolders"
+			CommandLine="xcopy /Y /I &quot;$(InputPath)&quot; &quot;$(OutDir)\$(InputName)&quot;"
+			Outputs="&quot;$(OutDir)\$(InputName)&quot;\readme.txt"
+			FileExtensions="*.CopyDeployFolder"
+			>
+		</CustomBuildRule>
+	</Rules>
+</VisualStudioToolFile>

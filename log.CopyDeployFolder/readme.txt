@@ -1,0 +1,1 @@
+DualServer creates its log files in this folder.
