@@ -535,7 +535,7 @@ void __cdecl serverloop(void *)
 			{
 				if (network.httpConn.ready && FD_ISSET(network.httpConn.sock, &readfds))
 				{
-					if (data19 *req = (data19*)calloc(1, sizeof(data19)))
+					if (data19 *req = new data19)
 					{
 						req->sockLen = sizeof req->remote;
 						req->sock = accept(network.httpConn.sock, (sockaddr*)&req->remote, &req->sockLen);
@@ -544,7 +544,7 @@ void __cdecl serverloop(void *)
 							int error = WSAGetLastError();
 							sprintf(logBuff, "Accept Failed, WSAError %u", error);
 							logDHCPMess(logBuff, 1);
-							free(req);
+							delete req;
 						}
 						else
 							procHTTP(req);
@@ -1600,7 +1600,7 @@ void procHTTP(data19 *req)
 		sprintf(logBuff, "Client %s, HTTP Access Denied", IP2String(req->remote.sin_addr.s_addr));
 		logDHCPMess(logBuff, 2);
 	}
-	else
+	else try
 	{
 		char *fp = buffer + bytes;
 		*fp = '\0';
@@ -1611,11 +1611,10 @@ void procHTTP(data19 *req)
 				fp = slash;
 			fp[strcspn(fp, "\t ")] = '\0';
 		}
-
 		if (!strcasecmp(fp, "/"))
 			sendStatus(req);
-	//	else if (!strcasecmp(fp, "/scopestatus"))
-	//		sendScopeStatus(req);
+		/*else if (!strcasecmp(fp, "/scopestatus"))
+			sendScopeStatus(req);*/
 		else
 		{
 			req->code = 404;
@@ -1631,32 +1630,25 @@ void procHTTP(data19 *req)
 			}
 		}
 	}
+	catch (std::bad_alloc)
+	{
+		req->code = 507;
+		sprintf(logBuff, "Memory Error");
+		logDHCPMess(logBuff, 1);
+	}
 	BeginThread(sendHTTP, 0, req);
 }
 
 void sendStatus(data19 *req)
 {
-	char logBuff[256];
 	char tempbuff[512];
 	//debug("sendStatus");
 
 	dhcpMap::iterator p;
-	//data7 *cache = NULL;
-	//printf("%d=%d\n", dhcpCache.size(), cfig.dhcpSize);
-	req->memSize = 2048 + (135 * dhcpCache.size()) + (cfig.dhcpSize * 26);
-	req->dp = (char*)calloc(1, req->memSize);
 
-	if (!req->dp)
-	{
-		sprintf(logBuff, "Memory Error");
-		logDHCPMess(logBuff, 1);
-		closesocket(req->sock);
-		free(req);
-		return;
-	}
+	class : public string, public string::CtorSprintf { } fp;
+	typedef string sprintf;
 
-	char *fp = req->dp;
-	char *maxData = req->dp + (req->memSize - 512);
 	fp += sprintf(fp, htmlStart, htmlTitle);
 	fp += sprintf(fp, bodyStart, sVersion);
 	fp += sprintf(fp, "<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n");
@@ -1672,7 +1664,7 @@ void sendStatus(data19 *req)
 		fp += sprintf(fp, "<tr><th>Mac Address</th><th>IP</th><th>Lease Expiry</th><th>Hostname</th></tr>\n");
 	}
 
-	for (p = dhcpCache.begin(); kRunning && p != dhcpCache.end() && fp < maxData; ++p)
+	for (p = dhcpCache.begin(); kRunning && p != dhcpCache.end(); ++p)
 	{
 		data7 *dhcpEntry = p->second;
 		if (dhcpEntry->display && dhcpEntry->expiry >= t)
@@ -1719,7 +1711,7 @@ void sendStatus(data19 *req)
 	fp += sprintf(fp, "<tr><th colspan=\"5\"><font size=\"5\"><i>Free Dynamic Leases</i></font></th></tr>\n");
 	MYBYTE colNum = 0;
 
-	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount && fp < maxData; rangeInd++)
+	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount; rangeInd++)
 	{
 		for (MYDWORD ind = 0, iip = cfig.dhcpRanges[rangeInd].rangeStart; kRunning && iip <= cfig.dhcpRanges[rangeInd].rangeEnd; iip++, ind++)
 		{
@@ -1750,7 +1742,7 @@ void sendStatus(data19 *req)
 	fp += sprintf(fp, "<tr><th colspan='4'><font size='5'><i>Free Dynamic Leases</i></font></th></tr>\n");
 	fp += sprintf(fp, "<tr><td colspan='2'><b>DHCP Range</b></td><td align='right'><b>Available Leases</b></td><td align='right'><b>Free Leases</b></td></tr>\n");
 
-	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount && fp < maxData; rangeInd++)
+	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount; ++rangeInd)
 	{
 		int ipused = 0;
 		int ipfree = 0;
@@ -1776,7 +1768,7 @@ void sendStatus(data19 *req)
 
 	MYBYTE colNum = 0;
 
-	for (p = dhcpCache.begin(); kRunning && p != dhcpCache.end() && fp < maxData; ++p)
+	for (p = dhcpCache.begin(); kRunning && p != dhcpCache.end(); ++p)
 	{
 		data7 *dhcpEntry = p->second;
 		if (dhcpEntry->fixed && dhcpEntry->expiry < t)
@@ -1806,7 +1798,7 @@ void sendStatus(data19 *req)
 
 	fp += sprintf(fp, "</table>\n</body>\n</html>");
 
-	req->bytes = fp - req->dp;
+	fp.swap(req->data);
 	req->code = 200;
 }
 
@@ -1815,29 +1807,16 @@ void sendScopeStatus(data19 *req)
 {
 	//debug("sendScopeStatus");
 
-	MYBYTE rangeCount = 0;
-	req->memSize = 1536 + (150 * cfig.rangeCount);
-	req->dp = (char*)calloc(1, req->memSize);
+	class : public string, public string::CtorSprintf { } fp;
+	typedef string sprintf;
 
-	if (!req->dp)
-	{
-		sprintf(logBuff, "Memory Error");
-		logDHCPMess(logBuff, 1);
-		closesocket(req->sock);
-		free(req);
-		return;
-	}
-
-	char *fp = req->dp;
-	char *maxData = req->dp + (req->memSize - 512);
 	fp += sprintf(fp, htmlStart, htmlTitle);
 	fp += sprintf(fp, bodyStart, sVersion);
 	fp += sprintf(fp, "<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n");
 	fp += sprintf(fp, "<tr><th colspan='4'><font size='5'><i>Scope Status</i></font></th></tr>\n");
 	fp += sprintf(fp, "<tr><td><b>DHCP Range</b></td><td align=\"right\"><b>IPs Used</b></td><td align=\"right\"><b>IPs Free</b></td><td align=\"right\"><b>%% Free</b></td></tr>\n");
-	MYBYTE colNum = 0;
 
-	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount && fp < maxData; rangeInd++)
+	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount; ++rangeInd)
 	{
 		float ipused = 0;
 		float ipfree = 0;
@@ -1861,7 +1840,7 @@ void sendScopeStatus(data19 *req)
 
 	fp += sprintf(fp, "</table>\n</body>\n</html>");
 
-	req->bytes = fp - req->dp;
+	fp.swap(req->data);
 	req->code = 200;
 }
 */
@@ -1883,8 +1862,9 @@ void __cdecl sendHTTP(void *param)
 	static const char send404[] =
 		"HTTP/1.1 404 Not Found\r\n\r\n<h1>404 Not Found</h1>";
 
-	//sprintf(logBuff, "sendHTTP memsize=%d bytes=%d", req->memSize, req->bytes);
-	//(logBuff);
+	static const char send507[] =
+		"HTTP/1.1 507 Not Found\r\n\r\n<h1>507 Insufficient Storage</h1>";
+
 	char header[512];
 	char *dp = header;
 
@@ -1892,7 +1872,7 @@ void __cdecl sendHTTP(void *param)
 	{
 	case 200:
 		dp += strftime(dp, _countof(header), send200, gmtime(&t));
-		dp += sprintf(dp, "Content-Length: %d\r\n\r\n", req->bytes);
+		dp += sprintf(dp, "Content-Length: %d\r\n\r\n", req->data.length());
 		break;
 	case 403:
 		dp += sprintf(dp, send403);
@@ -1900,16 +1880,19 @@ void __cdecl sendHTTP(void *param)
 	case 404:
 		dp += sprintf(dp, send404);
 		break;
+	case 507:
+		dp += sprintf(dp, send507);
+		break;
 	}
 
 	struct
 	{
 		int bytes;
-		char *dp;
+		const char *dp;
 	} chunks[] =
 	{
 		{ dp - header, header },
-		{ req->bytes, req->dp }
+		{ req->data.length(), req->data.c_str() }
 	}, *pchunk = chunks;
 
 	do
@@ -1940,8 +1923,7 @@ void __cdecl sendHTTP(void *param)
 		(pchunk->bytes > 0 || ++pchunk < chunks + _countof(chunks)));
 
 	closesocket(req->sock);
-	free(req->dp);
-	free(req);
+	delete req;
 	EndThread();
 }
 

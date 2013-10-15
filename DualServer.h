@@ -627,10 +627,16 @@ struct data19
 	SOCKADDR_IN remote;
 	socklen_t sockLen;
 	linger ling;
-	int memSize;
-	int bytes;
-	char *dp;
+	string data;
 	int code;
+	void *operator new(size_t size)
+	{
+		return calloc(1, size);
+	}
+	void operator delete(void *p)
+	{
+		free(p);
+	}
 };
 
 struct data20
