@@ -81,19 +81,22 @@ const char htmlStart[] =
 	"<meta http-equiv='cache-control' content='no-cache'>\n"
 	"<meta http-equiv='Content-Type' content='text/html; charset=UTF-8'>\n"
 	"<style>\n"
-	"table { table-layout: fixed; width: 640px; overflow: hidden; white-space: nowrap }\n"
+	"table { table-layout: fixed; width: 640px; overflow: hidden; }\n"
+	"tBody { font-family: monospace; word-wrap: break-word; }\n" // white-space: nowrap;
 	"</style>\n"
 	"</head>\n";
 const char bodyStart[] =
 	"<body bgcolor='#cccccc'>\n"
 	"<table><col width='40%%'><col width='60%%'>\n"
+	"<tHead>\n"
 	"<tr>"
-	"<td colspan='2' align='center'><font size='5'><b>%s</b></font></td>"
+	"<th colspan='2' align='center'><font size='5'>%s</font></th>"
 	"</tr>\n"
 	"<tr>"
 	"<td align='left'><a target='_new' href='http://dhcp-dns-server.sourceforge.net'>http://dhcp-dns-server.sourceforge.net</a></td>"
 	"<td align='right'>punycode-enabled fork: <a target='_new' href='https://bitbucket.org/jtuc/dualserver'>https://bitbucket.org/jtuc/dualserver</a></td>"
 	"</tr>\n"
+	"</tHead>\n"
 	"</table>\n";
 
 const data4 opData[] =
@@ -1646,23 +1649,42 @@ void sendStatus(data19 *req)
 
 	dhcpMap::iterator p;
 
-	class : public string, public string::CtorSprintf { } fp;
-	typedef string sprintf;
+	sprintf_string fp;
 
 	fp += sprintf(fp, htmlStart, htmlTitle);
 	fp += sprintf(fp, bodyStart, sVersion);
-	fp += sprintf(fp, "<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n");
+	fp += sprintf(fp,
+		"<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n"
+		"<tHead>\n");
 
 	if (cfig.dhcpRepl > t)
 	{
-		fp += sprintf(fp, "<tr><th colspan='5'><font size='5'><i>Active Leases</i></font></th></tr>\n");
-		fp += sprintf(fp, "<tr><th>Mac Address</th><th>IP</th><th>Lease Expiry</th><th>Hostname</th><th>Server</th></tr>\n");
+		fp += sprintf(fp,
+			"<tr>"
+			"<th colspan='5'><font size='5'><i>Active Leases</i></font></th>"
+			"</tr>\n"
+			"<tr>"
+			"<th>Mac Address</th>"
+			"<th>IP</th>"
+			"<th>Lease Expiry</th>"
+			"<th>Hostname</th>"
+			"<th>Server</th>"
+			"</tr>\n");
 	}
 	else
 	{
-		fp += sprintf(fp, "<tr><th colspan='4'><font size='5'><i>Active Leases</i></font></th></tr>\n");
-		fp += sprintf(fp, "<tr><th>Mac Address</th><th>IP</th><th>Lease Expiry</th><th>Hostname</th></tr>\n");
+		fp += sprintf(fp,
+			"<tr>"
+			"<th colspan='4'><font size='5'><i>Active Leases</i></font></th>"
+			"</tr>\n"
+			"<tr>"
+			"<th>Mac Address</th>"
+			"<th>IP</th>"
+			"<th>Lease Expiry</th>"
+			"<th>Hostname</th>"
+			"</tr>\n");
 	}
+	fp += sprintf(fp, "</tHead>\n");
 
 	for (p = dhcpCache.begin(); kRunning && p != dhcpCache.end(); ++p)
 	{
@@ -1738,9 +1760,20 @@ void sendStatus(data19 *req)
 	if (colNum)
 		fp += sprintf(fp, "</tr>\n");
 */
-	fp += sprintf(fp, "</table>\n<br>\n<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n");
-	fp += sprintf(fp, "<tr><th colspan='4'><font size='5'><i>Free Dynamic Leases</i></font></th></tr>\n");
-	fp += sprintf(fp, "<tr><td colspan='2'><b>DHCP Range</b></td><td align='right'><b>Available Leases</b></td><td align='right'><b>Free Leases</b></td></tr>\n");
+	fp += sprintf(fp,
+		"</table>\n"
+		"<br>\n"
+		"<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n"
+		"<tHead>\n"
+		"<tr>"
+		"<th colspan='4'><font size='5'><i>Free Dynamic Leases</i></font></th>"
+		"</tr>\n"
+		"<tr>"
+		"<th align='left' colspan='2'>DHCP Range</th>"
+		"<th align='right'>Available Leases</th>"
+		"<th align='right'>Free Leases</th>"
+		"</tr>\n"
+		"</tHead>\n");
 
 	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount; ++rangeInd)
 	{
@@ -1762,9 +1795,14 @@ void sendStatus(data19 *req)
 			ipfree);
 	}
 
-	fp += sprintf(fp, "</table>\n<br>\n<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n");
-	fp += sprintf(fp, "<tr><th colspan='4'><font size='5'><i>Free Static Leases</i></font></th></tr>\n");
-	fp += sprintf(fp, "<tr><th>Mac Address</th><th>IP</th><th>Mac Address</th><th>IP</th></tr>\n");
+	fp += sprintf(fp,
+		"</table>\n"
+		"<br>\n"
+		"<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n"
+		"<tHead>\n"
+		"<tr><th colspan='4'><font size='5'><i>Free Static Leases</i></font></th></tr>\n"
+		"<tr><th>Mac Address</th><th>IP</th><th>Mac Address</th><th>IP</th></tr>\n"
+		"</tHead>\n");
 
 	MYBYTE colNum = 0;
 
@@ -1807,8 +1845,7 @@ void sendScopeStatus(data19 *req)
 {
 	//debug("sendScopeStatus");
 
-	class : public string, public string::CtorSprintf { } fp;
-	typedef string sprintf;
+	sprintf_string fp;
 
 	fp += sprintf(fp, htmlStart, htmlTitle);
 	fp += sprintf(fp, bodyStart, sVersion);

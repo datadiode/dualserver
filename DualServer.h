@@ -35,6 +35,9 @@
 #include "EASTL/map.h"
 using namespace eastl;
 
+#define sprintf_string \
+	typedef string sprintf; struct : string, string::CtorSprintf { }
+
 #define MAX_SERVERS 125
 #define MAX_DHCP_RANGES 125
 #define MAX_DNS_RANGES 32
