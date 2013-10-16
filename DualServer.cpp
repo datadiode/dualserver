@@ -81,7 +81,8 @@ const char htmlStart[] =
 	"<meta http-equiv='cache-control' content='no-cache'>\n"
 	"<meta http-equiv='Content-Type' content='text/html; charset=UTF-8'>\n"
 	"<style>\n"
-	"table { table-layout: fixed; width: 640px; overflow: hidden; }\n"
+	"table { table-layout: fixed; width: 640px; font: 10pt sans-serif; }\n"
+	"tHead b, tHead i { font-size: 14pt; }\n"
 	"tBody { font-family: monospace; word-wrap: break-word; }\n" // white-space: nowrap;
 	"</style>\n"
 	"</head>\n";
@@ -90,7 +91,7 @@ const char bodyStart[] =
 	"<table><col width='40%%'><col width='60%%'>\n"
 	"<tHead>\n"
 	"<tr>"
-	"<th colspan='2' align='center'><font size='5'>%s</font></th>"
+	"<th colspan='2' align='center'><b>%s</b></th>"
 	"</tr>\n"
 	"<tr>"
 	"<td align='left'><a target='_new' href='http://dhcp-dns-server.sourceforge.net'>http://dhcp-dns-server.sourceforge.net</a></td>"
@@ -1661,7 +1662,7 @@ void sendStatus(data19 *req)
 	{
 		fp += sprintf(fp,
 			"<tr>"
-			"<th colspan='5'><font size='5'><i>Active Leases</i></font></th>"
+			"<th colspan='5'><i>Active Leases</i></th>"
 			"</tr>\n"
 			"<tr>"
 			"<th>Mac Address</th>"
@@ -1675,7 +1676,7 @@ void sendStatus(data19 *req)
 	{
 		fp += sprintf(fp,
 			"<tr>"
-			"<th colspan='4'><font size='5'><i>Active Leases</i></font></th>"
+			"<th colspan='4'><i>Active Leases</i></th>"
 			"</tr>\n"
 			"<tr>"
 			"<th>Mac Address</th>"
@@ -1730,7 +1731,7 @@ void sendStatus(data19 *req)
 
 /*
 	fp += sprintf(fp, "</table>\n<br>\n<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n");
-	fp += sprintf(fp, "<tr><th colspan=\"5\"><font size=\"5\"><i>Free Dynamic Leases</i></font></th></tr>\n");
+	fp += sprintf(fp, "<tr><th colspan='5'><i>Free Dynamic Leases</i></th></tr>\n");
 	MYBYTE colNum = 0;
 
 	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount; rangeInd++)
@@ -1766,7 +1767,7 @@ void sendStatus(data19 *req)
 		"<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n"
 		"<tHead>\n"
 		"<tr>"
-		"<th colspan='4'><font size='5'><i>Free Dynamic Leases</i></font></th>"
+		"<th colspan='4'><i>Free Dynamic Leases</i></th>"
 		"</tr>\n"
 		"<tr>"
 		"<th align='left' colspan='2'>DHCP Range</th>"
@@ -1800,7 +1801,7 @@ void sendStatus(data19 *req)
 		"<br>\n"
 		"<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n"
 		"<tHead>\n"
-		"<tr><th colspan='4'><font size='5'><i>Free Static Leases</i></font></th></tr>\n"
+		"<tr><th colspan='4'><i>Free Static Leases</i></th></tr>\n"
 		"<tr><th>Mac Address</th><th>IP</th><th>Mac Address</th><th>IP</th></tr>\n"
 		"</tHead>\n");
 
@@ -1850,7 +1851,7 @@ void sendScopeStatus(data19 *req)
 	fp += sprintf(fp, htmlStart, htmlTitle);
 	fp += sprintf(fp, bodyStart, sVersion);
 	fp += sprintf(fp, "<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n");
-	fp += sprintf(fp, "<tr><th colspan='4'><font size='5'><i>Scope Status</i></font></th></tr>\n");
+	fp += sprintf(fp, "<tr><th colspan='4'><i>Scope Status</i></th></tr>\n");
 	fp += sprintf(fp, "<tr><td><b>DHCP Range</b></td><td align=\"right\"><b>IPs Used</b></td><td align=\"right\"><b>IPs Free</b></td><td align=\"right\"><b>%% Free</b></td></tr>\n");
 
 	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount; ++rangeInd)
