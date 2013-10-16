@@ -35,10 +35,10 @@
 //Global Variables
 volatile bool kRunning = true;
 volatile LONG threadCount = 0;
-bool verbatim = false;
+const HANDLE verbatim = GetStdHandle(STD_OUTPUT_HANDLE);
 SERVICE_STATUS serviceStatus;
 SERVICE_STATUS_HANDLE serviceStatusHandle = 0;
-HANDLE stopServiceEvent = CreateEvent(NULL, TRUE, FALSE, 0);
+const HANDLE stopServiceEvent = CreateEvent(NULL, TRUE, FALSE, 0);
 data1 network;
 data2 cfig;
 data9 token;
@@ -307,16 +307,6 @@ void closeConn()
     }
 }
 
-void runService()
-{
-	SERVICE_TABLE_ENTRY serviceTable[] =
-	{
-		{ serviceName, ServiceMain },
-		{ NULL, NULL }
-	};
-	StartServiceCtrlDispatcher(serviceTable);
-}
-
 void showError(MYDWORD enumber)
 {
 	LPTSTR lpMsgBuf;
@@ -337,73 +327,63 @@ void showError(MYDWORD enumber)
 
 bool stopService(SC_HANDLE service)
 {
-	if (service)
+	SERVICE_STATUS serviceStatus;
+	QueryServiceStatus(service, &serviceStatus);
+	if (serviceStatus.dwCurrentState != SERVICE_STOPPED)
 	{
-		SERVICE_STATUS serviceStatus;
-		QueryServiceStatus(service, &serviceStatus);
-		if (serviceStatus.dwCurrentState != SERVICE_STOPPED)
+		ControlService(service, SERVICE_CONTROL_STOP, &serviceStatus);
+		printf("Stopping Service.");
+		for (int i = 0; i < 100; i++)
 		{
-			ControlService(service, SERVICE_CONTROL_STOP, &serviceStatus);
-			printf("Stopping Service.");
-			for (int i = 0; i < 100; i++)
+			QueryServiceStatus(service, &serviceStatus);
+			if (serviceStatus.dwCurrentState == SERVICE_STOPPED)
 			{
-				QueryServiceStatus(service, &serviceStatus);
-				if (serviceStatus.dwCurrentState == SERVICE_STOPPED)
-				{
-					printf("Stopped\n");
-					return true;
-				}
-				else
-				{
-					Sleep(500);
-					printf(".");
-				}
+				printf("Stopped\n");
+				return true;
 			}
-			printf("Failed\n");
-			return false;
+			else
+			{
+				Sleep(500);
+				printf(".");
+			}
 		}
+		printf("Failed\n");
+		return false;
 	}
 	return true;
 }
 
 void installService()
 {
-	SC_HANDLE serviceControlManager = OpenSCManager(0, 0, SC_MANAGER_CREATE_SERVICE | SERVICE_START);
-
-	if (serviceControlManager)
+	if (SC_HANDLE manager = OpenSCManager(
+		0, 0, SC_MANAGER_CREATE_SERVICE | SERVICE_START))
 	{
 		TCHAR path[_MAX_PATH];
-		if (GetModuleFileName(0, path, _countof(path)) > 0)
+		GetModuleFileName(0, path, _countof(path));
+
+		if (SC_HANDLE service = CreateService(
+			manager, serviceName, displayName,
+			SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
+			SERVICE_AUTO_START, SERVICE_ERROR_IGNORE, path,
+			0, 0, 0, 0, 0))
 		{
-			SC_HANDLE service = CreateService(serviceControlManager,
-											  serviceName, displayName,
-											  SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
-											  SERVICE_AUTO_START, SERVICE_ERROR_IGNORE, path,
-											  0, 0, 0, 0, 0);
-			if (service)
-			{
-				printf("Successfully installed.. !\n");
-				StartService(service, 0, NULL);
-				CloseServiceHandle(service);
-			}
-			else
-			{
-				showError(GetLastError());
-			}
+			printf("Successfully installed.. !\n");
+			StartService(service, 0, NULL);
+			CloseServiceHandle(service);
 		}
-		CloseServiceHandle(serviceControlManager);
+		else
+			showError(GetLastError());
+
+		CloseServiceHandle(manager);
 	}
 }
 
 void uninstallService()
 {
-	SC_HANDLE serviceControlManager = OpenSCManager(0, 0, SC_MANAGER_CONNECT);
-
-	if (serviceControlManager)
+	if (SC_HANDLE manager = OpenSCManager(0, 0, SC_MANAGER_CONNECT))
 	{
-		SC_HANDLE service = OpenService(serviceControlManager,
-		                                serviceName, SERVICE_QUERY_STATUS | SERVICE_STOP | DELETE);
-		if (service)
+		if (SC_HANDLE service = OpenService(manager,
+		    serviceName, SERVICE_QUERY_STATUS | SERVICE_STOP | DELETE))
 		{
 			if (stopService(service))
 			{
@@ -420,62 +400,63 @@ void uninstallService()
 		else
 			printf("Service Not Found..\n");
 
-		CloseServiceHandle(serviceControlManager);
+		CloseServiceHandle(manager);
 	}
 }
+
+static const SERVICE_TABLE_ENTRY serviceTable[] =
+{
+	{ serviceName, ServiceMain },
+	{ NULL, NULL }
+};
 
 int main(int argc, TCHAR* argv[])
 {
 	int ret = 0;
 	OSVERSIONINFO osvi;
-	osvi.dwOSVersionInfoSize = sizeof(osvi);
+	osvi.dwOSVersionInfoSize = sizeof osvi;
+	bool serviceStopped = argc == 1 || lstrcmpi(argv[1], TEXT("-v")) == 0;
 	if (GetVersionEx(&osvi) && osvi.dwPlatformId >= VER_PLATFORM_WIN32_NT)
 	{
-		if (argc > 1 && lstrcmpi(argv[1], TEXT("-i")) == 0)
+		if (serviceStopped)
 		{
-			installService();
-		}
-		else if (argc > 1 && lstrcmpi(argv[1], TEXT("-u")) == 0)
-		{
-			uninstallService();
-		}
-		else if (argc > 1 && lstrcmpi(argv[1], TEXT("-v")) == 0)
-		{
-			SC_HANDLE serviceControlManager = OpenSCManager(0, 0, SC_MANAGER_CONNECT);
-			bool serviceStopped = true;
-
-			if (serviceControlManager)
+			if (verbatim == NULL)
 			{
-				SC_HANDLE service = OpenService(serviceControlManager, serviceName, SERVICE_QUERY_STATUS | SERVICE_STOP);
-
-				if (service)
+				serviceStopped = !StartServiceCtrlDispatcher(serviceTable);
+			}
+			else if (SC_HANDLE manager = OpenSCManager(0, 0, SC_MANAGER_CONNECT))
+			{
+				if (SC_HANDLE service = OpenService(manager,
+					serviceName, SERVICE_QUERY_STATUS | SERVICE_STOP))
 				{
 					serviceStopped = stopService(service);
 					CloseServiceHandle(service);
 				}
-				CloseServiceHandle(serviceControlManager);
+				CloseServiceHandle(manager);
 			}
-
-			if (serviceStopped)
+			if (!serviceStopped)
 			{
-				verbatim = true;
-				SetConsoleCtrlHandler(ConsoleControlHandler, TRUE);
-				ret = runProg();
-			}
-			else
 				printf("Failed to Stop Service\n");
+			}
 		}
-		else
-			runService();
+		else if (lstrcmpi(argv[1], TEXT("-i")) == 0)
+		{
+			installService();
+		}
+		else if (lstrcmpi(argv[1], TEXT("-u")) == 0)
+		{
+			uninstallService();
+		}
 	}
-	else if (argc == 1 || lstrcmpi(argv[1], TEXT("-v")) == 0)
+	else if (!serviceStopped)
 	{
-		verbatim = true;
+		printf("This option is not available on Windows95/98/ME\n");
+	}
+	if (serviceStopped)
+	{
+		SetConsoleCtrlHandler(ConsoleControlHandler, TRUE);
 		ret = runProg();
 	}
-	else
-		printf("This option is not available on Windows95/98/ME\n");
-
 	return ret;
 }
 
@@ -9707,7 +9688,7 @@ void logMessVerbatim(const char *mess)
 			cch = _countof(tempBuff) - 1;
 		tempBuff[cch++] = L'\n';
 		DWORD dwcch;
-		WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), tempBuff, cch, &dwcch, NULL);
+		WriteConsoleW(verbatim, tempBuff, cch, &dwcch, NULL);
 	}
 }
 
