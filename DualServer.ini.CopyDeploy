@@ -1,16 +1,4 @@
-﻿#http://ccpowered.de/2011/windows-7-isos-als-download/
-#http://technet.microsoft.com/en-us/library/cc738403%28v=ws.10%29.aspx
-#http://msdn.microsoft.com/en-us/library/cc227315.aspx
-#http://technet.microsoft.com/de-de/library/cc771255.aspx - dynamic updates
-#http://www.pcreview.co.uk/forums/dhcp-client-causes-windows-xp-freeze-t207606.html
-#http://technet.microsoft.com/en-us/library/bb457118.aspx
-#http://www.chip.de/news/Windows-8.1-ISO-Download-kostenlos-laden_62723802.html NTTX3-RV7VB-T7X7F-WQYYY-9Y92F
-#http://windows.microsoft.com/de-de/windows-8/preview-iso
-#http://ftp.isc.org/isc/bind9/9.9.1-P3/BIND9.9.1-P3.zip
-#http://ftp.isc.org/isc/bind9/cur/9.9/
-#http://www.howtogeek.com/77132/how-to-enable-ping-echo-replies-in-windows-8/
-#http://www.akomolafe.com/KBFeeds/tabid/189/Default.aspx
-#This file should be in the same folder where DualServer.exe file is.
+﻿#This file should be in the same folder where DualServer.exe file is.
 #Any entry starting with a punctuation character will be a comment
 #You need to remove ; from begining of values and replace with your 
 #own values below if you need change settings.

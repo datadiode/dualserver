@@ -33,6 +33,7 @@
 
 #include "EASTL/string.h"
 #include "EASTL/map.h"
+
 using namespace eastl;
 
 #define sprintf_string \
@@ -845,7 +846,7 @@ char* strquery(data5*, char* = array<char, 512>().data);
 data7* findDHCPEntry(char*);
 data7* findEntry(MYBYTE, char*);
 data7* findEntry(MYBYTE, char*, MYBYTE);
-data7 *createCache(data71 *lump);
+data7 *createCache(const data71 *lump);
 MYDWORD alad(data9*);
 MYDWORD calcMask(MYDWORD, MYDWORD);
 MYDWORD chad(data9*);

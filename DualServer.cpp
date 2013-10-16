@@ -4815,7 +4815,6 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 	optionData->ip = 0;
 	optionData->mask = 0;
 	optionData->codepage = 0;
-	MYWORD buffsize = sizeof(dhcp_packet) - sizeof(dhcp_header);
 	MYBYTE *dp = optionData->options;
 	MYBYTE op_specified[256];
 
@@ -5049,19 +5048,18 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 
 		op_specified[opTag] = true;
 
+		const size_t buffsize = optionData->options + sizeof(dhcp_packet) - dp - sizeof(dhcp_header);
+
 		if (valType == 9)
 		{
-			if (buffsize > 2)
-			{
-				*dp++ = opTag;
-				*dp++ = 0;
-				buffsize -= 2;
-			}
-			else
+			if (buffsize <= 2U)
 			{
 				sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
 				logDHCPMess(logBuff, 1);
+				continue;
 			}
+			*dp++ = opTag;
+			*dp++ = 0;
 			continue;
 		}
 
@@ -5087,81 +5085,70 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 			// fall through
 		case 1:
 			value[valSize++] = 0;
-
 			if (valType != 1 && valType != 2)
 			{
 				sprintf(logBuff, "Warning: section [%s] option %s, need string value, option ignored", sectionName, raw);
 				logDHCPMess(logBuff, 1);
+				continue;
 			}
-			else if (opTag == DHCP_OPTION_DOMAINNAME)
+			if (opTag == DHCP_OPTION_DOMAINNAME)
 			{
 				sprintf(logBuff, "Warning: section [%s] option %u should be under [DOMAIN_NAME], ignored", sectionName, opTag);
 				logDHCPMess(logBuff, 1);
 				continue;
 			}
-			else if (buffsize > valSize + 2)
-			{
-				*dp++ = opTag;
-				*dp++ = valSize;
-				memcpy(dp, value, valSize);
-				dp += valSize;
-				buffsize -= (valSize + 2);
-			}
-			else
+			if (buffsize <= valSize + 2U)
 			{
 				sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
 				logDHCPMess(logBuff, 1);
+				continue;
 			}
+			*dp++ = opTag;
+			*dp++ = valSize;
+			memcpy(dp, value, valSize);
+			dp += valSize;
 			break;
 
 		case 3:
 		case 8:
-			if (valType == 2)
-			{
-				if (opType == 3 && valSize % 4)
-				{
-					sprintf(logBuff, "Warning: section [%s] option %s, missing/extra bytes/octates in IP, option ignored", sectionName, raw);
-					logDHCPMess(logBuff, 1);
-					continue;
-				}
-				else if (opType == 8 && valSize % 8)
-				{
-					sprintf(logBuff, "Warning: section [%s] option %s, some values not in IP/Mask form, option ignored", sectionName, raw);
-					logDHCPMess(logBuff, 1);
-					continue;
-				}
-
-				if (opTag == DHCP_OPTION_NETMASK)
-				{
-					if (valSize != 4 || !checkMask(fIP(value)))
-					{
-						sprintf(logBuff, "Warning: section [%s] Invalid subnetmask %s, option ignored", sectionName, raw);
-						logDHCPMess(logBuff, 1);
-						continue;
-					}
-					else
-						optionData->mask = fIP(value);
-				}
-
-				if (buffsize > valSize + 2)
-				{
-					*dp++ = opTag;
-					*dp++ = valSize;
-					memcpy(dp, value, valSize);
-					dp += valSize;
-					buffsize -= (valSize + 2);
-				}
-				else
-				{
-					sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
-					logDHCPMess(logBuff, 1);
-				}
-			}
-			else
+			if (valType != 2)
 			{
 				sprintf(logBuff, "Warning: section [%s] option %s, Invalid value, should be one or more IP/4 Bytes", sectionName, raw);
 				logDHCPMess(logBuff, 1);
+				continue;
 			}
+			if (opType == 3 && valSize % 4)
+			{
+				sprintf(logBuff, "Warning: section [%s] option %s, missing/extra bytes/octates in IP, option ignored", sectionName, raw);
+				logDHCPMess(logBuff, 1);
+				continue;
+			}
+			else if (opType == 8 && valSize % 8)
+			{
+				sprintf(logBuff, "Warning: section [%s] option %s, some values not in IP/Mask form, option ignored", sectionName, raw);
+				logDHCPMess(logBuff, 1);
+				continue;
+			}
+			if (opTag == DHCP_OPTION_NETMASK)
+			{
+				if (valSize != 4 || !checkMask(fIP(value)))
+				{
+					sprintf(logBuff, "Warning: section [%s] Invalid subnetmask %s, option ignored", sectionName, raw);
+					logDHCPMess(logBuff, 1);
+					continue;
+				}
+				optionData->mask = fIP(value);
+			}
+			if (buffsize <= valSize + 2U)
+			{
+				sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
+				logDHCPMess(logBuff, 1);
+				continue;
+			}
+			*dp++ = opTag;
+			*dp++ = valSize;
+			memcpy(dp, value, valSize);
+			dp += valSize;
 			break;
 
 		case 4:
@@ -5173,39 +5160,33 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 				logDHCPMess(logBuff, 1);
 				continue;
 			}
-
 			if (opTag == DHCP_OPTION_IPADDRLEASE)
 			{
 				if (j == 0)
 					j = UINT_MAX;
-
 				if (!strcasecmp(sectionName, GLOBALOPTIONS))
 				{
 					sprintf(logBuff, "Warning: section [%s] option %s not allowed in this section, please set it in [TIMINGS] section", sectionName, raw);
 					logDHCPMess(logBuff, 1);
 					continue;
 				}
-				else if (j > cfig.lease)
+				if (j > cfig.lease)
 				{
 					sprintf(logBuff, "Warning: section [%s] option %s value should be less then %u (max lease), ignored", sectionName, name, cfig.lease);
 					logDHCPMess(logBuff, 1);
 					continue;
 				}
 			}
-
-			if (buffsize > 6)
-			{
-				*dp++ = opTag;
-				*dp++ = 4;
-				dp += pULong(dp, j);
-				buffsize -= 6;
-				//printf("%s=%u=%u\n",opData[op_index].opName,opData[op_index].opType,htonl(j));
-			}
-			else
+			if (buffsize <= 6U)
 			{
 				sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
 				logDHCPMess(logBuff, 1);
+				continue;
 			}
+			*dp++ = opTag;
+			*dp++ = 4;
+			dp += pULong(dp, j);
+			//printf("%s=%u=%u\n",opData[op_index].opName,opData[op_index].opType,htonl(j));
 			break;
 
 		case 5:
@@ -5217,19 +5198,15 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 				logDHCPMess(logBuff, 1);
 				continue;
 			}
-
-			if (buffsize > 4)
-			{
-				*dp++ = opTag;
-				*dp++ = 2;
-				dp += pUShort(dp, static_cast<MYWORD>(j));
-				buffsize -= 4;
-			}
-			else
+			if (buffsize <= 4U)
 			{
 				sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
 				logDHCPMess(logBuff, 1);
+				continue;
 			}
+			*dp++ = opTag;
+			*dp++ = 2;
+			dp += pUShort(dp, static_cast<MYWORD>(j));
 			break;
 
 		case 6:
@@ -5241,19 +5218,16 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 				logDHCPMess(logBuff, 1);
 				continue;
 			}
-
-			if (buffsize > 3)
-			{
-				*dp++ = opTag;
-				*dp++ = 1;
-				*dp++ = static_cast<MYBYTE>(j);
-				buffsize -= 3;
-			}
-			else
+			if (buffsize <= 3U)
 			{
 				sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
 				logDHCPMess(logBuff, 1);
+				continue;
 			}
+			*dp++ = opTag;
+			*dp++ = 1;
+			*dp++ = static_cast<MYBYTE>(j);
+			break;
 
 		case 7:
 			if (valType == 2 && valSize == 1 && *value < 2)
@@ -5268,19 +5242,15 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 				logDHCPMess(logBuff, 1);
 				continue;
 			}
-
-			if (buffsize > 3)
-			{
-				*dp++ = opTag;
-				*dp++ = 1;
-				*dp++ = static_cast<MYBYTE>(j);
-				buffsize -= 3;
-			}
-			else
+			if (buffsize <= 3U)
 			{
 				sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
 				logDHCPMess(logBuff, 1);
+				continue;
 			}
+			*dp++ = opTag;
+			*dp++ = 1;
+			*dp++ = static_cast<MYBYTE>(j);
 			break;
 
 		default:
@@ -5290,26 +5260,22 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 				valSize = 1;
 				*value = static_cast<char>(atoi(value));
 			}
-
 			if (opType == 2 && valType != 2)
 			{
 				sprintf(logBuff, "Warning: section [%s] option %s, value should be comma separated bytes or hex string, option ignored", sectionName, raw);
 				logDHCPMess(logBuff, 1);
 				continue;
 			}
-			else if (buffsize > valSize + 2)
-			{
-				*dp++ = opTag;
-				*dp++ = valSize;
-				memcpy(dp, value, valSize);
-				dp += valSize;
-				buffsize -= (valSize + 2);
-			}
-			else
+			if (buffsize <= valSize + 2U)
 			{
 				sprintf(logBuff, "Warning: section [%s] option %s, no more space for options", sectionName, raw);
 				logDHCPMess(logBuff, 1);
+				continue;
 			}
+			*dp++ = opTag;
+			*dp++ = valSize;
+			memcpy(dp, value, valSize);
+			dp += valSize;
 			break;
 		}
 
@@ -5321,7 +5287,6 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 
 	*dp++ = DHCP_OPTION_END;
 	optionData->optionSize = static_cast<MYWORD>(dp - optionData->options);
-	//printf("section=%s buffersize = %u option size=%u\n", sectionName, buffsize, optionData->optionSize);
 	return !strcasecmp(raw, sectionName);
 }
 
@@ -9782,7 +9747,7 @@ void logTCPMess(data5 *req, const char *logBuff, MYBYTE logLevel)
 	}
 }
 
-data7 *createCache(data71 *lump)
+data7 *createCache(const data71 *lump)
 {
 	size_t dataSize = sizeof(data7) + strlen(lump->mapname) + 1;
 
