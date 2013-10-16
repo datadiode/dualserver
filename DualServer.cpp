@@ -109,7 +109,7 @@ const data4 opData[] =
 	{ "LPRServer",							DHCP_OPTION_LPRSERVER,				3,	true	},
 	{ "ImpressServer",						DHCP_OPTION_IMPRESSSERVER,			3,	true	},
 	{ "RLPServer",							DHCP_OPTION_RESLOCSERVER,			3,	true	},
-	{ "Hostname",							DHCP_OPTION_HOSTNAME,				1,	true	},
+	{ "Hostname",							DHCP_OPTION_HOSTNAME,				9,	true	},
 	{ "BootFileSize",						DHCP_OPTION_BOOTFILESIZE,			5,	true	},
 	{ "MeritDumpFile",						DHCP_OPTION_MERITDUMP,				1,	true	},
 	{ "DomainName",							DHCP_OPTION_DOMAINNAME,				1,	true	},
@@ -5048,6 +5048,24 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 
 		switch (opType)
 		{
+		case 9:
+			if (unsigned codepage = optionData->codepage ? optionData->codepage : cfig.codepage)
+			{
+				WCHAR utf16[512];
+				int cch = MultiByteToWideChar(CP_UTF8, 0, value, -1, utf16, 512);
+				if (cch >= 0 && cch < _countof(utf16))
+				{
+					len = WideCharToMultiByte(codepage, 0, utf16, -1, value, 512, NULL, NULL);
+					if (len > UCHAR_MAX)
+					{
+						sprintf(logBuff, "Warning: section [%s] option %s value too big, option ignored", sectionName, raw);
+						logDHCPMess(logBuff, 1);
+						continue;
+					}
+					valSize = static_cast<MYBYTE>(len);
+				}
+			}
+			// fall through
 		case 1:
 			value[valSize++] = 0;
 
