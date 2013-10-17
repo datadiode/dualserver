@@ -9117,7 +9117,10 @@ void getInterfaces(data1 *network, FILE *ff)
 {
 	char logBuff[256];
 
-	memset(network, 0, sizeof(data1));
+	memset(network, 0, sizeof *network);
+
+	network->staticServers[0] = 0x0100007F;
+	network->staticMasks[0] = 0xFFFFFFFF;
 
 	SOCKET sd = WSASocket(PF_INET, SOCK_DGRAM, 0, 0, 0, 0);
 
@@ -9147,10 +9150,7 @@ void getInterfaces(data1 *network, FILE *ff)
 
 	closesocket(sd);
 
-	PIP_ADAPTER_INFO pAdapterInfo;
-	PIP_ADAPTER_INFO pAdapter;
-
-	pAdapterInfo = (IP_ADAPTER_INFO*) calloc(1, sizeof(IP_ADAPTER_INFO));
+	PIP_ADAPTER_INFO pAdapterInfo = (IP_ADAPTER_INFO*) calloc(1, sizeof(IP_ADAPTER_INFO));
 	DWORD ulOutBufLen = sizeof(IP_ADAPTER_INFO);
 
 	if (GetAdaptersInfo(pAdapterInfo, &ulOutBufLen) == ERROR_BUFFER_OVERFLOW)
@@ -9161,7 +9161,7 @@ void getInterfaces(data1 *network, FILE *ff)
 
 	if ((GetAdaptersInfo(pAdapterInfo, &ulOutBufLen)) == NO_ERROR)
 	{
-		pAdapter = pAdapterInfo;
+		PIP_ADAPTER_INFO pAdapter = pAdapterInfo;
 		while (pAdapter)
 		{
 			if (!pAdapter->DhcpEnabled)
