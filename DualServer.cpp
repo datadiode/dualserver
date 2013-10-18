@@ -74,28 +74,31 @@ const char GLOBALOPTIONS[] = "GLOBAL_OPTIONS";
 const char td200[] = "<td>%s</td>";
 const char sVersion[] = "Dual DHCP DNS Server Version 7.11p Windows Build 0001";
 const char htmlStart[] =
+	"<!DOCTYPE HTML 4.0 Transitional>\n"
 	"<html>\n"
 	"<head>\n"
-	"<title>%s</title>"
+	"<title>%s</title>\n"
 	"<meta http-equiv='refresh' content='60'>\n"
 	"<meta http-equiv='cache-control' content='no-cache'>\n"
 	"<meta http-equiv='Content-Type' content='text/html; charset=UTF-8'>\n"
 	"<style>\n"
-	"table { table-layout: fixed; width: 640px; font: 10pt sans-serif; }\n"
-	"tHead b, tHead i { font-size: 14pt; }\n"
-	"tBody { font-family: monospace; word-wrap: break-word; }\n" // white-space: nowrap;
+	"body { background-color: #cccccc; }\n"
+	"table { table-layout: fixed; width: 480pt; margin-top: 2ex; }\n"
+	"caption { font: bold 14pt sans-serif; }\n"
+	"tHead td { font: 10pt sans-serif; }\n"
+	"tHead th { font: bold italic 14pt sans-serif; background-color: #b8b8b8; }\n"
+	"tBody th { font: bold 10pt sans-serif; background-color: #b8b8b8; }\n"
+	"tBody td { font: 10pt monospace; word-wrap: break-word; background-color: #b8b8b8; }\n" // white-space: nowrap;
 	"</style>\n"
 	"</head>\n";
 const char bodyStart[] =
-	"<body bgcolor='#cccccc'>\n"
-	"<table><col width='40%%'><col width='60%%'>\n"
+	"<body>\n"
+	"<table>\n"
+	"<caption>%s</caption>\n"
 	"<tHead>\n"
-	"<tr>"
-	"<th colspan='2' align='center'><b>%s</b></th>"
-	"</tr>\n"
-	"<tr>"
-	"<td align='left'><a target='_new' href='http://dhcp-dns-server.sourceforge.net'>http://dhcp-dns-server.sourceforge.net</a></td>"
-	"<td align='right'>punycode-enabled fork: <a target='_new' href='https://bitbucket.org/jtuc/dualserver'>https://bitbucket.org/jtuc/dualserver</a></td>"
+	"<tr>\n"
+	"<td width='40%%' align='left'><a target='_new' href='http://dhcp-dns-server.sourceforge.net'>http://dhcp-dns-server.sourceforge.net</a></td>\n"
+	"<td width='60%%' align='right'>punycode-enabled fork: <a target='_new' href='https://bitbucket.org/jtuc/dualserver'>https://bitbucket.org/jtuc/dualserver</a></td>\n"
 	"</tr>\n"
 	"</tHead>\n"
 	"</table>\n";
@@ -1635,16 +1638,12 @@ void sendStatus(data19 *req)
 
 	fp += sprintf(fp, htmlStart, htmlTitle);
 	fp += sprintf(fp, bodyStart, sVersion);
-	fp += sprintf(fp,
-		"<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n"
-		"<tHead>\n");
+	fp += sprintf(fp, "<table border='1' cellpadding='1'>\n");
 
 	if (cfig.dhcpRepl > t)
 	{
 		fp += sprintf(fp,
-			"<tr>"
-			"<th colspan='5'><i>Active Leases</i></th>"
-			"</tr>\n"
+			"<tHead><tr><th colspan='5'>Active Leases</th></tr></tHead>\n"
 			"<tr>"
 			"<th>Mac Address</th>"
 			"<th>IP</th>"
@@ -1656,9 +1655,7 @@ void sendStatus(data19 *req)
 	else
 	{
 		fp += sprintf(fp,
-			"<tr>"
-			"<th colspan='4'><i>Active Leases</i></th>"
-			"</tr>\n"
+			"<tHead><tr><th colspan='4'>Active Leases</th></tr></tHead>\n"
 			"<tr>"
 			"<th>Mac Address</th>"
 			"<th>IP</th>"
@@ -1666,7 +1663,6 @@ void sendStatus(data19 *req)
 			"<th>Hostname</th>"
 			"</tr>\n");
 	}
-	fp += sprintf(fp, "</tHead>\n");
 
 	for (p = dhcpCache.begin(); kRunning && p != dhcpCache.end(); ++p)
 	{
@@ -1711,8 +1707,8 @@ void sendStatus(data19 *req)
 	}
 
 /*
-	fp += sprintf(fp, "</table>\n<br>\n<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n");
-	fp += sprintf(fp, "<tr><th colspan='5'><i>Free Dynamic Leases</i></th></tr>\n");
+	fp += sprintf(fp, "</table>\n<table border='1' cellpadding='1'>\n");
+	fp += sprintf(fp, "<tHead><tr><th colspan='5'>Free Dynamic Leases</th></tr></tHead>\n");
 	MYBYTE colNum = 0;
 
 	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount; rangeInd++)
@@ -1744,18 +1740,13 @@ void sendStatus(data19 *req)
 */
 	fp += sprintf(fp,
 		"</table>\n"
-		"<br>\n"
-		"<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n"
-		"<tHead>\n"
-		"<tr>"
-		"<th colspan='4'><i>Free Dynamic Leases</i></th>"
-		"</tr>\n"
+		"<table border='1' cellpadding='1'>\n"
+		"<tHead><tr><th colspan='4'>Free Dynamic Leases</th></tr></tHead>\n"
 		"<tr>"
 		"<th align='left' colspan='2'>DHCP Range</th>"
 		"<th align='right'>Available Leases</th>"
 		"<th align='right'>Free Leases</th>"
-		"</tr>\n"
-		"</tHead>\n");
+		"</tr>\n");
 
 	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount; ++rangeInd)
 	{
@@ -1779,12 +1770,9 @@ void sendStatus(data19 *req)
 
 	fp += sprintf(fp,
 		"</table>\n"
-		"<br>\n"
-		"<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n"
-		"<tHead>\n"
-		"<tr><th colspan='4'><i>Free Static Leases</i></th></tr>\n"
-		"<tr><th>Mac Address</th><th>IP</th><th>Mac Address</th><th>IP</th></tr>\n"
-		"</tHead>\n");
+		"<table border='1' cellpadding='1'>\n"
+		"<tHead><tr><th colspan='4'>Free Static Leases</th></tr></tHead>\n"
+		"<tr><th>Mac Address</th><th>IP</th><th>Mac Address</th><th>IP</th></tr>\n");
 
 	MYBYTE colNum = 0;
 
@@ -1831,7 +1819,7 @@ void sendScopeStatus(data19 *req)
 
 	fp += sprintf(fp, htmlStart, htmlTitle);
 	fp += sprintf(fp, bodyStart, sVersion);
-	fp += sprintf(fp, "<table bgcolor='#b8b8b8' border='1' cellpadding='1'>\n");
+	fp += sprintf(fp, "<table border='1' cellpadding='1'>\n");
 	fp += sprintf(fp, "<tr><th colspan='4'><i>Scope Status</i></th></tr>\n");
 	fp += sprintf(fp, "<tr><td><b>DHCP Range</b></td><td align=\"right\"><b>IPs Used</b></td><td align=\"right\"><b>IPs Free</b></td><td align=\"right\"><b>%% Free</b></td></tr>\n");
 
