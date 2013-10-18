@@ -100,7 +100,7 @@ using namespace eastl;
 
 struct dnsHeader
 {
-	unsigned xid :16;	//query identification number
+	unsigned xid: 16;	//query identification number
 	/* byte boundry */
 	unsigned rd: 1;		//recursion desired
 	unsigned tc: 1;		//truncated message
@@ -108,16 +108,16 @@ struct dnsHeader
 	unsigned opcode: 4;	//option code
 	unsigned qr: 1;		//response flag
 	/* byte boundry */
-	unsigned rcode :4;	//response code
+	unsigned rcode: 4;	//response code
 	unsigned cd: 1;		//checking disabled by resolver
 	unsigned at: 1;		//authentic data from named
-	unsigned unused :1;	//unused
+	unsigned unused: 1;	//unused
 	unsigned ra: 1;		//recursion available
 	/* byte boundry */
-	unsigned qdcount :16;	//number of question entries
-	unsigned ancount :16;	//number of answer entries
-	unsigned nscount :16;	//number of authority entries
-	unsigned adcount :16;	//number of additional entries
+	unsigned qdcount: 16;	//number of question entries
+	unsigned ancount: 16;	//number of answer entries
+	unsigned nscount: 16;	//number of authority entries
+	unsigned adcount: 16;	//number of additional entries
 };
 
 /*
@@ -260,6 +260,23 @@ struct data5 //dns request
 	MYBYTE sockInd;
 	MYBYTE dnsIndex;
 	MYBYTE respType;
+
+	int send(SOCKET sock, int flags = 0) const
+	{
+		return ::send(sock, raw, bytes, flags);
+	}
+	int sendto(SOCKET sock, const SOCKADDR_IN &sa, int flags = 0) const
+	{
+		return ::sendto(sock, raw, bytes, flags,
+			reinterpret_cast<const sockaddr *>(&sa), sizeof sa);
+	}
+	int recvfrom(SOCKET sock, int flags = 0)
+	{
+		memset(this, 0, sizeof *this);
+		sockLen = sizeof remote;
+		return bytes = ::recvfrom(sock, raw, sizeof raw, flags,
+			reinterpret_cast<sockaddr *>(&remote), &sockLen);
+	}
 };
 
 enum
@@ -685,6 +702,19 @@ struct data9 //dhcpRequst
 	MYBYTE req_type;
 	MYBYTE resp_type;
 	MYBYTE sockInd;
+
+	int sendto(SOCKET sock, const SOCKADDR_IN &sa, int flags = 0) const
+	{
+		return ::sendto(sock, raw, bytes, flags,
+			reinterpret_cast<const sockaddr *>(&sa), sizeof sa);
+	}
+	int recvfrom(SOCKET sock, int flags = 0)
+	{
+		memset(this, 0, sizeof *this);
+		sockLen = sizeof remote;
+		return bytes = ::recvfrom(sock, raw, sizeof raw, flags,
+			reinterpret_cast<sockaddr *>(&remote), &sockLen);
+	}
 };
 
 struct DhcpConnType
@@ -747,6 +777,7 @@ struct data1
 	MYDWORD staticServers[MAX_SERVERS];
 	MYDWORD staticMasks[MAX_SERVERS];
 	MYDWORD dns[MAX_SERVERS];
+	char encoding[MAX_SERVERS]; // (u)tf-8 or (p)unycode
 	SOCKET maxFD;
 	MYBYTE currentDNS;
 	bool ready;
@@ -840,7 +871,7 @@ char* genHostName(char*, const MYBYTE*, MYBYTE);
 char* hex2String(char*, const MYBYTE*, MYBYTE);
 char* IP2String(MYDWORD, char* = array<char, 256>().data);
 char* IP62String(MYBYTE*, char* = array<char, 256>().data);
-char* myLower(char* string);
+char* myLower(char* string, bool = true);
 FILE* readSection(char*, FILE*, FILE* = NULL);
 char* strquery(data5*, char* = array<char, 512>().data);
 data7* findDHCPEntry(char*);
@@ -854,9 +885,8 @@ MYDWORD getClassNetwork(MYDWORD);
 MYDWORD getZone(MYBYTE, char*);
 MYDWORD getSerial(const char*);
 MYDWORD resad(data9*);
-MYDWORD sdmess(data9*);
-MYDWORD sendRepl(data9 *req);
-MYDWORD updateDHCP(data9*);
+int sdmess(data9*);
+int sendRepl(data9 *req);
 MYDWORD* findServer(MYDWORD*, MYBYTE, MYDWORD);
 MYDWORD* addServer(MYDWORD*, MYBYTE, MYDWORD);
 int getIndex(char, MYDWORD);
@@ -893,7 +923,7 @@ void checkSize(MYBYTE);
 void checkDNS(MYBYTE);
 void closeConn();
 void delDnsEntry(MYBYTE, data7*);
-void getInterfaces(data1*, FILE*);
+void getInterfaces(FILE*);
 void logDebug(const data9*);
 bool lockOptions(FILE*, const char*);
 bool loadOptions(FILE*, const char*, data20*);
