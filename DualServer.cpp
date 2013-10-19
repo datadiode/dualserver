@@ -501,16 +501,7 @@ void __cdecl serverloop(void *)
 
 				if (cfig.dhcpReplConn.ready && FD_ISSET(cfig.dhcpReplConn.sock, &readfds))
 				{
-					dhcpr.sockLen = sizeof(dhcpr.remote);
-
-					dhcpr.bytes = recvfrom(cfig.dhcpReplConn.sock,
-										   dhcpr.raw,
-										   sizeof(dhcpr.raw),
-										   0,
-										   (sockaddr*)&dhcpr.remote,
-										   &dhcpr.sockLen);
-
-					if (dhcpr.bytes <= 0)
+					if (dhcpr.recvfrom(cfig.dhcpReplConn.sock) <= 0)
 						cfig.dhcpRepl = 0;
 				}
 
@@ -531,7 +522,7 @@ void __cdecl serverloop(void *)
 						{
 							if (scanloc(&dnsr))
 							{
-								if (htons(dnsr.dnsp->header.ancount))
+								if (htons(dnsr.dnsp->ancount))
 								{
 									if (verbatim || cfig.dnsLogLevel >= 2)
 									{
@@ -547,10 +538,10 @@ void __cdecl serverloop(void *)
 										logDNSMess(&dnsr, logBuff, 2);
 									}
 								}
-								else if (dnsr.dnsp->header.rcode == RCODE_NAMEERROR || dnsr.dnsp->header.rcode == RCODE_NOERROR)
+								else if (dnsr.dnsp->rcode == RCODE_NAMEERROR || dnsr.dnsp->rcode == RCODE_NOERROR)
 								{
 									if (dnsr.qtype != DNS_TYPE_SOA)
-										dnsr.dnsp->header.rcode = RCODE_NAMEERROR;
+										dnsr.dnsp->rcode = RCODE_NAMEERROR;
 
 									if (verbatim || cfig.dnsLogLevel >= 2)
 									{
@@ -599,7 +590,7 @@ void __cdecl serverloop(void *)
 						{
 							const char *from = dnsr.dnsIndex < MAX_SERVERS ?
 								"Forwarding Server" : "Conditional Forwarder";
-							if (dnsr.dnsp->header.ancount)
+							if (dnsr.dnsp->ancount)
 							{
 								char tempbuff[512];
 								if (getResult(&dnsr, tempbuff))
@@ -657,7 +648,7 @@ bool chkQu(const char *query)
 	return strlen(query) < 64;
 }
 
-MYWORD fQu(char *query, dnsPacket *mess, char *raw)
+MYWORD fQu(char *query, dnsHeader *mess, char *raw)
 {
 	MYBYTE *xname = (MYBYTE*)query;
 	MYBYTE *xraw = (MYBYTE*)raw;
@@ -775,31 +766,31 @@ MYBYTE pIP(void *raw, MYDWORD data)
 
 void addRRBlank(data5 *req)
 {
-	req->dnsp->header.ra = 0;
-	req->dnsp->header.at = 0;
-	req->dnsp->header.aa = 0;
-	req->dnsp->header.qr = 1;
-	req->dp = &req->dnsp->data;
-	req->dnsp->header.qdcount = 0;
-	req->dnsp->header.ancount = 0;
-	req->dnsp->header.nscount = 0;
-	req->dnsp->header.adcount = 0;
+	req->dnsp->ra = 0;
+	req->dnsp->at = 0;
+	req->dnsp->aa = 0;
+	req->dnsp->qr = 1;
+	req->dp = req->dnsp->data();
+	req->dnsp->qdcount = 0;
+	req->dnsp->ancount = 0;
+	req->dnsp->nscount = 0;
+	req->dnsp->adcount = 0;
 }
 
 void addRRNone(data5 *req)
 {
 	if (network.dns[0])
-		req->dnsp->header.ra = 1;
+		req->dnsp->ra = 1;
 	else
-		req->dnsp->header.ra = 0;
+		req->dnsp->ra = 0;
 
-	req->dnsp->header.at = 0;
-	req->dnsp->header.aa = 0;
+	req->dnsp->at = 0;
+	req->dnsp->aa = 0;
 
-	req->dnsp->header.qr = 1;
-	req->dnsp->header.ancount = 0;
-	req->dnsp->header.nscount = 0;
-	req->dnsp->header.adcount = 0;
+	req->dnsp->qr = 1;
+	req->dnsp->ancount = 0;
+	req->dnsp->nscount = 0;
+	req->dnsp->adcount = 0;
 }
 
 void addRRExt(data5 *req)
@@ -810,16 +801,16 @@ void addRRExt(data5 *req)
 	if (strcasecmp(req->cname, req->query))
 	{
 		memcpy(req->temp, req->raw, req->bytes);
-		dnsPacket *input = (dnsPacket*)req->temp;
-		req->dnsp = (dnsPacket*)req->raw;
+		dnsHeader *input = (dnsHeader*)req->temp;
+		req->dnsp = (dnsHeader*)req->raw;
 
-		req->dnsp->header.aa = 0;
-		req->dnsp->header.at = 0;
-		req->dnsp->header.qdcount = htons(1);
-		req->dnsp->header.ancount = htons(1);
+		req->dnsp->aa = 0;
+		req->dnsp->at = 0;
+		req->dnsp->qdcount = htons(1);
+		req->dnsp->ancount = htons(1);
 
 		//manuplate the response
-		req->dp = &req->dnsp->data;
+		req->dp = req->dnsp->data();
 		req->dp += pQu(req->dp, req->query);
 		req->dp += pUShort(req->dp, DNS_TYPE_A);
 		req->dp += pUShort(req->dp, DNS_CLASS_IN);
@@ -830,15 +821,15 @@ void addRRExt(data5 *req)
 		req->dp += pUShort(req->dp, qLen(req->cname));
 		req->dp += pQu(req->dp, req->cname);
 
-		char *indp = &input->data;
+		char *indp = input->data();
 
-		for (int i = 1; i <= ntohs(input->header.qdcount); i++)
+		for (int i = 1; i <= ntohs(input->qdcount); i++)
 		{
 			indp += fQu(tempbuff, input, indp);
 			indp += 4;
 		}
 
-		for (int i = 1; i <= ntohs(input->header.ancount); i++)
+		for (int i = 1; i <= ntohs(input->ancount); i++)
 		{
 			indp += fQu(tempbuff, input, indp);
 			MYWORD type = fUShort(indp);
@@ -867,12 +858,12 @@ void addRRExt(data5 *req)
 			}
 
 			indp += zLen;
-			req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+			req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 		}
 	}
 	else
 	{
-		req->dnsp = (dnsPacket*)req->raw;
+		req->dnsp = (dnsHeader*)req->raw;
 		req->dp = req->raw + req->bytes;
 	}
 }
@@ -882,17 +873,17 @@ void addRRCache(data5 *req, data7 *cache)
 	char tempbuff[512];
 	//manuplate the response
 	//printf("%s=%s\n", req->cname, req->query);
-	dnsPacket *input = (dnsPacket*)cache->response;
-	char *indp = &input->data;
-	req->dnsp = (dnsPacket*)req->raw;
-	req->dp = &req->dnsp->data;
+	dnsHeader *input = (dnsHeader*)cache->response;
+	char *indp = input->data();
+	req->dnsp = (dnsHeader*)req->raw;
+	req->dp = req->dnsp->data();
 
-	req->dnsp->header.aa = 0;
-	req->dnsp->header.at = 0;
-	req->dnsp->header.ancount = 0;
-	req->dnsp->header.qdcount = htons(1);
+	req->dnsp->aa = 0;
+	req->dnsp->at = 0;
+	req->dnsp->ancount = 0;
+	req->dnsp->qdcount = htons(1);
 
-	req->dp = &req->dnsp->data;
+	req->dp = req->dnsp->data();
 	req->dp += pQu(req->dp, req->query);
 	req->dp += pUShort(req->dp, DNS_TYPE_A);
 	req->dp += pUShort(req->dp, DNS_CLASS_IN);
@@ -905,16 +896,16 @@ void addRRCache(data5 *req, data7 *cache)
 		req->dp += pULong(req->dp, cfig.lease);
 		req->dp += pUShort(req->dp, qLen(req->cname));
 		req->dp += pQu(req->dp, req->cname);
-		req->dnsp->header.ancount = htons(1);
+		req->dnsp->ancount = htons(1);
 	}
 
-	for (int i = 1; i <= ntohs(input->header.qdcount); i++)
+	for (int i = 1; i <= ntohs(input->qdcount); i++)
 	{
 		indp += fQu(tempbuff, input, indp);
 		indp += 4;
 	}
 
-	for (int i = 1; i <= ntohs(input->header.ancount); i++)
+	for (int i = 1; i <= ntohs(input->ancount); i++)
 	{
 		indp += fQu(tempbuff, input, indp);
 		MYWORD type = fUShort(indp);
@@ -947,7 +938,7 @@ void addRRCache(data5 *req, data7 *cache)
 		}
 
 		indp += zLen;
-		req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+		req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 	}
 }
 
@@ -955,7 +946,7 @@ void addRRA(data5 *req)
 {
 	if (strcasecmp(req->query, req->cname))
 	{
-		req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+		req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 		req->dp += pQu(req->dp, req->query);
 		req->dp += pUShort(req->dp, DNS_TYPE_CNAME);
 		req->dp += pUShort(req->dp, DNS_CLASS_IN);
@@ -973,7 +964,7 @@ void addRRA(data5 *req)
 
 		if (cache->ip)
 		{
-			req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+			req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 			req->dp += pQu(req->dp, req->cname);
 			req->dp += pUShort(req->dp, DNS_TYPE_A);
 			req->dp += pUShort(req->dp, DNS_CLASS_IN);
@@ -997,7 +988,7 @@ void addRRPtr(data5 *req)
 			req->dp += pQu(req->dp, req->query);
 			req->dp += pUShort(req->dp, DNS_TYPE_PTR);
 			req->dp += pUShort(req->dp, DNS_CLASS_IN);
-			req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+			req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 			req->dp += pULong(req->dp, cfig.lease);
 
 			if (!cache->hostname[0])
@@ -1018,7 +1009,7 @@ void addRRServerA(data5 *req)
 {
 	if (strcasecmp(req->query, req->cname))
 	{
-		req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+		req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 		req->dp += pQu(req->dp, req->query);
 		req->dp += pUShort(req->dp, DNS_TYPE_CNAME);
 		req->dp += pUShort(req->dp, DNS_CLASS_IN);
@@ -1027,7 +1018,7 @@ void addRRServerA(data5 *req)
 		req->dp += pQu(req->dp, req->cname);
 	}
 
-	req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+	req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 	req->dp += pQu(req->dp, req->cname);
 	req->dp += pUShort(req->dp, DNS_TYPE_A);
 	req->dp += pUShort(req->dp, DNS_CLASS_IN);
@@ -1044,7 +1035,7 @@ void addRRServerA(data5 *req)
 
 			if (cache->ip && cache->ip != network.dnsUdpConn[req->sockInd].server)
 			{
-				req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+				req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 				req->dp += pQu(req->dp, req->cname);
 				req->dp += pUShort(req->dp, DNS_TYPE_A);
 				req->dp += pUShort(req->dp, DNS_CLASS_IN);
@@ -1067,9 +1058,9 @@ void addRRAny(data5 *req, bool adFlag)
 				break;
 
 			if (adFlag)
-				req->dnsp->header.adcount = htons(htons(req->dnsp->header.adcount) + 1);
+				req->dnsp->adcount = htons(htons(req->dnsp->adcount) + 1);
 			else
-				req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+				req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 
 			switch (cache->dataType)
 			{
@@ -1136,7 +1127,7 @@ void addRRAny(data5 *req, bool adFlag)
 
 void addRRWildA(data5 *req, MYDWORD ip)
 {
-	req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+	req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 	req->dp += pQu(req->dp, req->query);
 	req->dp += pUShort(req->dp, DNS_TYPE_A);
 	req->dp += pUShort(req->dp, DNS_CLASS_IN);
@@ -1150,7 +1141,7 @@ void addRRLocalhostA(data5 *req, data7 *cache)
 {
 	if (strcasecmp(req->query, req->mapname))
 	{
-		req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+		req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 		req->dp += pQu(req->dp, req->query);
 		req->dp += pUShort(req->dp, DNS_TYPE_CNAME);
 		req->dp += pUShort(req->dp, DNS_CLASS_IN);
@@ -1159,7 +1150,7 @@ void addRRLocalhostA(data5 *req, data7 *cache)
 		req->dp += pQu(req->dp, req->mapname);
 	}
 
-	req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+	req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 	req->dp += pQu(req->dp, req->mapname);
 	req->dp += pUShort(req->dp, DNS_TYPE_A);
 	req->dp += pUShort(req->dp, DNS_CLASS_IN);
@@ -1171,7 +1162,7 @@ void addRRLocalhostA(data5 *req, data7 *cache)
 
 void addRRLocalhostPtr(data5 *req, data7 *cache)
 {
-	req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+	req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 	req->dp += pQu(req->dp, req->query);
 	req->dp += pUShort(req->dp, DNS_TYPE_PTR);
 	req->dp += pUShort(req->dp, DNS_CLASS_IN);
@@ -1199,9 +1190,9 @@ void addRRNS(data5 *req)
 	//printf("%s=%u\n", cfig.ns, cfig.expireTime);
 	if (cfig.authorized && cfig.expireTime > t)
 	{
-		req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
-		req->dnsp->header.at = 1;
-		req->dnsp->header.aa = 1;
+		req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
+		req->dnsp->at = 1;
+		req->dnsp->aa = 1;
 
 		if (req->dnType == DNTYPE_P_LOCAL || req->dnType == DNTYPE_P_EXT || req->dnType == DNTYPE_P_ZONE)
 			req->dp += pQu(req->dp, cfig.authority);
@@ -1231,9 +1222,9 @@ void addRRSOA(data5 *req)
 {
 	if (cfig.authorized)
 	{
-		req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
-		req->dnsp->header.at = 1;
-		req->dnsp->header.aa = 1;
+		req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
+		req->dnsp->at = 1;
+		req->dnsp->aa = 1;
 
 		if (req->dnType == DNTYPE_P_LOCAL || req->dnType == DNTYPE_P_EXT || req->dnType == DNTYPE_P_ZONE)
 			req->dp += pQu(req->dp, cfig.authority);
@@ -1272,9 +1263,9 @@ void addRRSOAuth(data5 *req)
 {
 	if (cfig.authorized)
 	{
-		req->dnsp->header.nscount = htons(htons(req->dnsp->header.nscount) + 1);
-		req->dnsp->header.at = 1;
-		req->dnsp->header.aa = 1;
+		req->dnsp->nscount = htons(htons(req->dnsp->nscount) + 1);
+		req->dnsp->at = 1;
+		req->dnsp->aa = 1;
 
 		if (req->dnType == DNTYPE_P_LOCAL || req->dnType == DNTYPE_P_EXT || req->dnType == DNTYPE_P_ZONE)
 			req->dp += pQu(req->dp, cfig.authority);
@@ -1313,10 +1304,10 @@ void addNS(data5 *req)
 {
 	if (cfig.authorized && cfig.expireTime > t)
 	{
-		req->dnsp->header.at = 1;
-		req->dnsp->header.aa = 1;
+		req->dnsp->at = 1;
+		req->dnsp->aa = 1;
 
-		req->dnsp->header.nscount = htons(1);
+		req->dnsp->nscount = htons(1);
 
 		if (req->dnType == DNTYPE_P_LOCAL || req->dnType == DNTYPE_P_EXT || req->dnType == DNTYPE_P_ZONE)
 			req->dp += pQu(req->dp, cfig.authority);
@@ -1351,7 +1342,7 @@ void addRRAd(data5 *req)
 {
 	if (cfig.authorized && cfig.expireTime > t)
 	{
-		req->dnsp->header.adcount = htons(htons(req->dnsp->header.adcount) + 1);
+		req->dnsp->adcount = htons(htons(req->dnsp->adcount) + 1);
 
 		if (req->dnType == DNTYPE_P_LOCAL || req->dnType == DNTYPE_P_EXT || req->dnType == DNTYPE_P_ZONE)
 			req->dp += pQu(req->dp, cfig.nsP);
@@ -1375,7 +1366,7 @@ void addRRAOne(data5 *req)
 {
 	if (data7 *cache = req->iterBegin->second)
 	{
-		req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+		req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 
 		if (!cache->mapname[0])
 			strcpy(req->cname, cfig.zone);
@@ -1398,7 +1389,7 @@ void addRRPtrOne(data5 *req)
 {
 	if (data7 *cache = req->iterBegin->second)
 	{
-		req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+		req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 		sprintf(req->cname, "%s%s", cache->mapname, arpa);
 		req->dp += pQu(req->dp, req->cname);
 		req->dp += pUShort(req->dp, DNS_TYPE_PTR);
@@ -1423,7 +1414,7 @@ void addRRSTAOne(data5 *req)
 {
 	if (data7 *cache = req->iterBegin->second)
 	{
-		req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+		req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 
 		if (!cache->mapname[0])
 			strcpy(req->cname, cfig.zone);
@@ -1446,7 +1437,7 @@ void addRRCNOne(data5 *req)
 {
 	if (data7 *cache = req->iterBegin->second)
 	{
-		req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+		req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 
 		if (!cache->mapname[0])
 			strcpy(req->cname, cfig.zone);
@@ -1476,7 +1467,7 @@ void addRRCNOne(data5 *req)
 void addRRMXOne(data5 *req, MYBYTE m)
 {
 	//req->dp += pQu(req->dp, req->query);
-	req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+	req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 	req->dp += pQu(req->dp, cfig.zone);
 	req->dp += pUShort(req->dp, DNS_TYPE_MX);
 	req->dp += pUShort(req->dp, DNS_CLASS_IN);
@@ -1508,22 +1499,22 @@ void procTCP(data5 *req)
 
 	//MYWORD pktSize = fUShort(req->raw);
 	req->dp = req->raw + 2;
-	req->dnsp = (dnsPacket*)(req->dp);
-	req->dp = &req->dnsp->data;
+	req->dnsp = (dnsHeader*)(req->dp);
+	req->dp = req->dnsp->data();
 
-	if (req->dnsp->header.qr != 0 || ntohs(req->dnsp->header.qdcount) != 1 || ntohs(req->dnsp->header.ancount))
+	if (req->dnsp->qr != 0 || ntohs(req->dnsp->qdcount) != 1 || ntohs(req->dnsp->ancount))
 	{
 		sprintf(logBuff, "DNS Query Format Error");
 		logTCPMess(req, logBuff, 1);
 		addRRNone(req);
-		req->dnsp->header.rcode = RCODE_FORMATERROR;
-		req->dnsp->header.qdcount = 0;
+		req->dnsp->rcode = RCODE_FORMATERROR;
+		req->dnsp->qdcount = 0;
 		sendTCPmess(req);
 		closesocket(req->sock);
 		return;
 	}
 
-	for (int i = 1; i <= ntohs(req->dnsp->header.qdcount); i++)
+	for (int i = 1; i <= ntohs(req->dnsp->qdcount); i++)
 	{
 		req->dp += fQu(req->query, req->dnsp, req->dp);
 		req->qtype = fUShort(req->dp);
@@ -1539,15 +1530,15 @@ void procTCP(data5 *req)
 		sprintf(logBuff, "DNS TCP Query, Access Denied");
 		logTCPMess(req, logBuff, 1);
 		addRRNone(req);
-		req->dnsp->header.rcode = RCODE_REFUSED;
+		req->dnsp->rcode = RCODE_REFUSED;
 		sendTCPmess(req);
 		closesocket(req->sock);
 		return;
 	}
 
-	if (req->dnsp->header.opcode != OPCODE_STANDARD_QUERY)
+	if (req->dnsp->opcode != OPCODE_STANDARD_QUERY)
 	{
-		switch (req->dnsp->header.opcode)
+		switch (req->dnsp->opcode)
 		{
 		case OPCODE_INVERSE_QUERY:
 			sprintf(logBuff, "Inverse query not supported");
@@ -1566,14 +1557,14 @@ void procTCP(data5 *req)
 			break;
 
 		default:
-			sprintf(logBuff, "OpCode %u not supported", req->dnsp->header.opcode);
+			sprintf(logBuff, "OpCode %u not supported", req->dnsp->opcode);
 			break;
 		}
 
 		logTCPMess(req, logBuff, 1);
 
 		addRRNone(req);
-		req->dnsp->header.rcode = RCODE_NOTIMPL;
+		req->dnsp->rcode = RCODE_NOTIMPL;
 		sendTCPmess(req);
 		closesocket(req->sock);
 		return;
@@ -1584,7 +1575,7 @@ void procTCP(data5 *req)
 		sprintf(logBuff, "DNS Class %u not supported", req->qclass);
 		logTCPMess(req, logBuff, 1);
 		addRRNone(req);
-		req->dnsp->header.rcode = RCODE_NOTIMPL;
+		req->dnsp->rcode = RCODE_NOTIMPL;
 		sendTCPmess(req);
 		closesocket(req->sock);
 		return;
@@ -1595,7 +1586,7 @@ void procTCP(data5 *req)
 		sprintf(logBuff, "missing query type");
 		logTCPMess(req, logBuff, 1);
 		addRRNone(req);
-		req->dnsp->header.rcode = RCODE_FORMATERROR;
+		req->dnsp->rcode = RCODE_FORMATERROR;
 		sendTCPmess(req);
 		closesocket(req->sock);
 		return;
@@ -1619,7 +1610,7 @@ void procTCP(data5 *req)
 	if (req->qtype != DNS_TYPE_NS && req->qtype != DNS_TYPE_SOA && req->qtype != DNS_TYPE_AXFR && req->qtype != DNS_TYPE_IXFR)
 	{
 		addRRNone(req);
-		req->dnsp->header.rcode = RCODE_NOTIMPL;
+		req->dnsp->rcode = RCODE_NOTIMPL;
 		sendTCPmess(req);
 		sprintf(logBuff, "DNS TCP query % Query Type not supported", strquery(req));
 		logTCPMess(req, logBuff, 1);
@@ -1627,7 +1618,7 @@ void procTCP(data5 *req)
 	else if (!cfig.authorized || (req->dnType != DNTYPE_A_ZONE && req->dnType != DNTYPE_A_SUBZONE && req->dnType != DNTYPE_P_ZONE && req->dnType != DNTYPE_P_LOCAL))
 	{
 		addRRNone(req);
-		req->dnsp->header.rcode = RCODE_NOTAUTH;
+		req->dnsp->rcode = RCODE_NOTAUTH;
 		sendTCPmess(req);
 		sprintf(logBuff, "Server is not authority for zone %s", req->query);
 		logTCPMess(req, logBuff, 1);
@@ -1635,7 +1626,7 @@ void procTCP(data5 *req)
 	else if (cfig.expireTime < t)
 	{
 		addRRNone(req);
-		req->dnsp->header.rcode = RCODE_NOTZONE;
+		req->dnsp->rcode = RCODE_NOTZONE;
 		sendTCPmess(req);
 		sprintf(logBuff, "Zone %s expired", req->query);
 		logTCPMess(req, logBuff, 1);
@@ -1649,9 +1640,9 @@ void procTCP(data5 *req)
 			{
 				addRRNone(req);
 				addRRSOA(req);
-				req->dnsp->header.aa = 0;
-				req->dnsp->header.at = 0;
-				req->dnsp->header.rcode = RCODE_NOERROR;
+				req->dnsp->aa = 0;
+				req->dnsp->at = 0;
+				req->dnsp->rcode = RCODE_NOERROR;
 				sendTCPmess(req);
 				sprintf(logBuff, "SOA Sent for zone %s", req->query);
 				logTCPMess(req, logBuff, 2);
@@ -1660,9 +1651,9 @@ void procTCP(data5 *req)
 			{
 				addRRNone(req);
 				addRRSOAuth(req);
-				req->dnsp->header.aa = 0;
-				req->dnsp->header.at = 0;
-				req->dnsp->header.rcode = RCODE_NOERROR;
+				req->dnsp->aa = 0;
+				req->dnsp->at = 0;
+				req->dnsp->rcode = RCODE_NOERROR;
 				sendTCPmess(req);
 				sprintf(logBuff, "%s not found", strquery(req));
 				logDNSMess(req, logBuff, 2);
@@ -1675,9 +1666,9 @@ void procTCP(data5 *req)
 				addRRNone(req);
 				addRRNS(req);
 				addRRAd(req);
-				req->dnsp->header.aa = 0;
-				req->dnsp->header.at = 0;
-				req->dnsp->header.rcode = RCODE_NOERROR;
+				req->dnsp->aa = 0;
+				req->dnsp->at = 0;
+				req->dnsp->rcode = RCODE_NOERROR;
 				sendTCPmess(req);
 				sprintf(logBuff, "NS Sent for Zone %s", req->query);
 				logTCPMess(req, logBuff, 2);
@@ -1686,9 +1677,9 @@ void procTCP(data5 *req)
 			{
 				addRRNone(req);
 				addNS(req);
-				req->dnsp->header.aa = 0;
-				req->dnsp->header.at = 0;
-				req->dnsp->header.rcode = RCODE_NOERROR;
+				req->dnsp->aa = 0;
+				req->dnsp->at = 0;
+				req->dnsp->rcode = RCODE_NOERROR;
 				sendTCPmess(req);
 				sprintf(logBuff, "%s not found", strquery(req));
 				logDNSMess(req, logBuff, 2);
@@ -1811,7 +1802,7 @@ void procTCP(data5 *req)
 				if (clientIP == cfig.zoneServers[0])
 				{
 					addRRNone(req);
-					req->dnsp->header.rcode = RCODE_REFUSED;
+					req->dnsp->rcode = RCODE_REFUSED;
 					sendTCPmess(req);
 					closesocket(req->sock);
 					return;
@@ -1897,7 +1888,7 @@ void procTCP(data5 *req)
 			else
 			{
 				addRRNone(req);
-				req->dnsp->header.rcode = RCODE_NOTAUTH;
+				req->dnsp->rcode = RCODE_NOTAUTH;
 				sendTCPmess(req);
 				sprintf(logBuff, "Server is not authority for zone %s", req->query);
 				logTCPMess(req, logBuff, 1);
@@ -1909,7 +1900,7 @@ void procTCP(data5 *req)
 
 int sendTCPmess(data5 *req)
 {
-	req->dnsp->header.ra = 0;
+	req->dnsp->ra = 0;
 	req->bytes = req->dp - req->raw;
 	pUShort(req->raw, static_cast<MYWORD>(req->bytes - 2));
 
@@ -1928,16 +1919,16 @@ int gdnmess(data5 *req, MYBYTE sockInd)
 		return 0;
 
 	req->sockInd = sockInd;
-	req->dnsp = (dnsPacket*)req->raw;
+	req->dnsp = (dnsHeader*)req->raw;
 
-	if (req->dnsp->header.qr != 0)
+	if (req->dnsp->qr != 0)
 		return 0;
 
-	if (req->dnsp->header.opcode != OPCODE_STANDARD_QUERY)
+	if (req->dnsp->opcode != OPCODE_STANDARD_QUERY)
 	{
 		if (verbatim || cfig.dnsLogLevel >= 1)
 		{
-			switch (req->dnsp->header.opcode)
+			switch (req->dnsp->opcode)
 			{
 			case OPCODE_INVERSE_QUERY:
 				sprintf(logBuff, "Inverse query not supported");
@@ -1956,18 +1947,18 @@ int gdnmess(data5 *req, MYBYTE sockInd)
 				break;
 
 			default:
-				sprintf(logBuff, "OpCode %d not supported", req->dnsp->header.opcode);
+				sprintf(logBuff, "OpCode %d not supported", req->dnsp->opcode);
 				break;
 			}
 			logDNSMess(req, logBuff, 1);
 		}
 
 		addRRBlank(req);
-		req->dnsp->header.rcode = RCODE_NOTIMPL;
+		req->dnsp->rcode = RCODE_NOTIMPL;
 		return 0;
 	}
 
-	if (ntohs(req->dnsp->header.qdcount) != 1 || ntohs(req->dnsp->header.ancount))
+	if (ntohs(req->dnsp->qdcount) != 1 || ntohs(req->dnsp->ancount))
 	{
 		if (verbatim || cfig.dnsLogLevel >= 1)
 		{
@@ -1976,13 +1967,13 @@ int gdnmess(data5 *req, MYBYTE sockInd)
 		}
 
 		addRRBlank(req);
-		req->dnsp->header.rcode = RCODE_FORMATERROR;
+		req->dnsp->rcode = RCODE_FORMATERROR;
 		return 0;
 	}
 
-	req->dp = &req->dnsp->data;
+	req->dp = req->dnsp->data();
 
-	for (int i = 1; i <= ntohs(req->dnsp->header.qdcount); i++)
+	for (int i = 1; i <= ntohs(req->dnsp->qdcount); i++)
 	{
 		req->dp += fQu(req->query, req->dnsp, req->dp);
 		req->qtype = fUShort(req->dp);
@@ -1999,7 +1990,7 @@ int gdnmess(data5 *req, MYBYTE sockInd)
 			logDNSMess(req, logBuff, 1);
 		}
 		addRRNone(req);
-		req->dnsp->header.rcode = RCODE_NOTIMPL;
+		req->dnsp->rcode = RCODE_NOTIMPL;
 		return 0;
 	}
 
@@ -2012,7 +2003,7 @@ int gdnmess(data5 *req, MYBYTE sockInd)
 		}
 
 		addRRNone(req);
-		req->dnsp->header.rcode = RCODE_FORMATERROR;
+		req->dnsp->rcode = RCODE_FORMATERROR;
 		return 0;
 	}
 
@@ -2035,7 +2026,7 @@ int gdnmess(data5 *req, MYBYTE sockInd)
 		return req->bytes;
 
 	addRRNone(req);
-	req->dnsp->header.rcode = RCODE_REFUSED;
+	req->dnsp->rcode = RCODE_REFUSED;
 
 	if (verbatim || cfig.dnsLogLevel >= 1)
 	{
@@ -2159,14 +2150,14 @@ MYWORD scanloc(data5 *req)
 			case DNTYPE_A_BARE:
 				addRRNone(req);
 				sprintf(req->cname, "%s.%s", req->mapname, cfig.zone);
-				req->dnsp->header.ancount = htons(htons(req->dnsp->header.ancount) + 1);
+				req->dnsp->ancount = htons(htons(req->dnsp->ancount) + 1);
 				req->dp += pQu(req->dp, req->mapname);
 				req->dp += pUShort(req->dp, DNS_TYPE_CNAME);
 				req->dp += pUShort(req->dp, DNS_CLASS_IN);
 				req->dp += pULong(req->dp, cfig.lease);
 				req->dp += pUShort(req->dp, qLen(req->cname));
 				req->dp += pQu(req->dp, req->cname);
-				req->dnsp->header.ancount = htons(1);
+				req->dnsp->ancount = htons(1);
 				addRRAny(req, true);
 				return 1;
 
@@ -2176,7 +2167,7 @@ MYWORD scanloc(data5 *req)
 				{
 					addRRSOA(req);
 					addRRNS(req);
-					req->dnsp->header.ancount = htons(2);
+					req->dnsp->ancount = htons(2);
 				}
 
 				for (MYBYTE m = 0; m < cfig.mxCount[currentInd]; m++)
@@ -2195,7 +2186,7 @@ MYWORD scanloc(data5 *req)
 				{
 					addRRSOA(req);
 					addRRNS(req);
-					req->dnsp->header.ancount = htons(2);
+					req->dnsp->ancount = htons(2);
 				}
 
 				//if (cfig.authorized)
@@ -2219,7 +2210,7 @@ MYWORD scanloc(data5 *req)
 				{
 					addRRSOA(req);
 					addRRNS(req);
-					req->dnsp->header.ancount = htons(2);
+					req->dnsp->ancount = htons(2);
 				}
 
 				for (MYBYTE m = 0; m < cfig.mxCount[currentInd]; m++)
@@ -2236,7 +2227,7 @@ MYWORD scanloc(data5 *req)
 				{
 					addRRSOA(req);
 					addRRNS(req);
-					req->dnsp->header.ancount = htons(2);
+					req->dnsp->ancount = htons(2);
 				}
 
 				//if (cfig.authorized)
@@ -2267,7 +2258,7 @@ MYWORD scanloc(data5 *req)
 				logDNSMess(req, logBuff, 1);
 			}
 			addRRNone(req);
-			req->dnsp->header.rcode = RCODE_NOTIMPL;
+			req->dnsp->rcode = RCODE_NOTIMPL;
 			addNS(req);
 			return 1;
 		}
@@ -2398,7 +2389,7 @@ MYWORD scanloc(data5 *req)
 	{
 		//printf("mapname=%s, hostname=%s datatype=%i exp=%u\n",cache->mapname, cache->hostname, req->respType,cache->expiry);
 		req->dnType = makeLocal(req->mapname);
-		req->dp = &req->dnsp->data;
+		req->dp = req->dnsp->data();
 		req->dp += pQu(req->dp, req->cname);
 		req->dp += pUShort(req->dp, DNS_TYPE_A);
 		req->dp += pUShort(req->dp, DNS_CLASS_IN);
@@ -2413,15 +2404,15 @@ void transcode(data5 *req, char encoding)
 	char tempbuff[512];
 
 	memcpy(req->temp, req->raw, req->bytes);
-	dnsPacket *input = (dnsPacket*)req->temp;
-	req->dnsp = (dnsPacket*)req->raw;
+	dnsHeader *input = (dnsHeader*)req->temp;
+	req->dnsp = (dnsHeader*)req->raw;
 
 	//manuplate the response
-	req->dp = &req->dnsp->data;
+	req->dp = req->dnsp->data();
 
-	char *indp = &input->data;
+	char *indp = input->data();
 
-	for (int i = 0; i < ntohs(input->header.qdcount); ++i)
+	for (int i = 0; i < ntohs(input->qdcount); ++i)
 	{
 		indp += fQu(tempbuff, input, indp);
 		char *buff = tempbuff;
@@ -2458,7 +2449,7 @@ int fdnmess(data5 *req)
 	int nRet = -1;
 
 	char mapname[8];
-	sprintf(mapname, "%u", req->dnsp->header.xid);
+	sprintf(mapname, "%u", req->dnsp->xid);
 	data7 *queue = findEntry(currentInd, mapname, QUEUE);
 
 	for (zoneDNS = 0; zoneDNS < MAX_COND_FORW && cfig.dnsRoutes[zoneDNS].zLen; zoneDNS++)
@@ -2495,7 +2486,7 @@ int fdnmess(data5 *req)
 							IP2String(req->addr.sin_addr.s_addr));
 						logDNSMess(req, logBuff, 1);
 						addRRNone(req);
-						req->dnsp->header.rcode = RCODE_SERVERFAIL;
+						req->dnsp->rcode = RCODE_SERVERFAIL;
 					}
 
 					if (cfig.dnsRoutes[zoneDNS].dns[1])
@@ -2542,27 +2533,27 @@ int fdnmess(data5 *req)
 			case DNS_TYPE_NS:
 				addRRNone(req);
 				addNS(req);
-				req->dnsp->header.rcode = RCODE_NOERROR;
+				req->dnsp->rcode = RCODE_NOERROR;
 				return 0;
 
 			case DNS_TYPE_SOA:
 				addRRNone(req);
 				addRRSOAuth(req);
-				req->dnsp->header.rcode = RCODE_NOERROR;
+				req->dnsp->rcode = RCODE_NOERROR;
 				return 0;
 
 			default:
 				addRRNone(req);
 				addNS(req);
-				req->dnsp->header.rcode = RCODE_NAMEERROR;
+				req->dnsp->rcode = RCODE_NAMEERROR;
 				return 0;
 			}
 		}
 
-		if (!req->dnsp->header.rd)
+		if (!req->dnsp->rd)
 		{
 			addRRNone(req);
-			req->dnsp->header.rcode = RCODE_NAMEERROR;
+			req->dnsp->rcode = RCODE_NAMEERROR;
 			if (verbatim || cfig.dnsLogLevel)
 			{
 				sprintf(logBuff, "%s is not found (recursion not desired)", strquery(req));
@@ -2574,8 +2565,8 @@ int fdnmess(data5 *req)
 		if (!network.dns[0])
 		{
 			addRRNone(req);
-			req->dnsp->header.rcode = RCODE_NAMEERROR;
-			req->dnsp->header.ra = 0;
+			req->dnsp->rcode = RCODE_NAMEERROR;
+			req->dnsp->ra = 0;
 			if (verbatim || cfig.dnsLogLevel)
 			{
 				sprintf(logBuff, "%s not found (recursion not available)", strquery(req));
@@ -2611,7 +2602,7 @@ int fdnmess(data5 *req)
 						IP2String(network.dns[network.currentDNS]));
 					logDNSMess(req, logBuff, 1);
 					addRRNone(req);
-					req->dnsp->header.rcode = RCODE_SERVERFAIL;
+					req->dnsp->rcode = RCODE_SERVERFAIL;
 				}
 
 				++network.currentDNS;
@@ -2673,11 +2664,11 @@ bool frdnmess(data5 *req)
 	if (req->recvfrom(network.forwConn.sock) <= 0)
 		return false;
 
-	req->dnsp = (dnsPacket*)req->raw;
+	req->dnsp = (dnsHeader*)req->raw;
 
 	char mapname[8];
 	MYWORD type = 0;
-	sprintf(mapname, "%u", req->dnsp->header.xid);
+	sprintf(mapname, "%u", req->dnsp->xid);
 	data7 *queue = findEntry(currentInd, mapname);
 
 	if (queue && queue->expiry)
@@ -2715,21 +2706,21 @@ bool frdnmess(data5 *req)
 			req->sockInd = queue->sockInd;
 			req->dnsIndex = queue->dnsIndex;
 
-			req->dp = &req->dnsp->data;
+			req->dp = req->dnsp->data();
 
-			for (int i = 1; i <= ntohs(req->dnsp->header.qdcount); i++)
+			for (int i = 1; i <= ntohs(req->dnsp->qdcount); i++)
 			{
 				req->dp += fQu(req->cname, req->dnsp, req->dp);
 				type = fUShort(req->dp);
 				req->dp += 4; //type and class
 			}
 
-			if ((type == DNS_TYPE_A || type == DNS_TYPE_PTR) && !req->dnsp->header.rcode && !req->dnsp->header.tc && req->dnsp->header.ancount)
+			if ((type == DNS_TYPE_A || type == DNS_TYPE_PTR) && !req->dnsp->rcode && !req->dnsp->tc && req->dnsp->ancount)
 			{
 				time_t expiry = 0;
 				bool resultFound = false;
 
-				for (int i = 1; i <= ntohs(req->dnsp->header.ancount); i++)
+				for (int i = 1; i <= ntohs(req->dnsp->ancount); i++)
 				{
 					req->dp += fQu(tempbuff, req->dnsp, req->dp);
 					type = fUShort(req->dp);
@@ -2991,15 +2982,15 @@ char* getResult(data5 *req, char *tempbuff)
 	//try
 	{
 		tempbuff[0] = 0;
-		char *raw = &req->dnsp->data;
+		char *raw = req->dnsp->data();
 
-		for (int i = 1; i <= ntohs(req->dnsp->header.qdcount); i++)
+		for (int i = 1; i <= ntohs(req->dnsp->qdcount); i++)
 		{
 			raw += fQu(buff, req->dnsp, raw);
 			raw += 4;
 		}
 
-		for (int i = 1; i <= ntohs(req->dnsp->header.ancount); i++)
+		for (int i = 1; i <= ntohs(req->dnsp->ancount); i++)
 		{
 			raw += fQu(buff, req->dnsp, raw);
 			int type = fUShort(raw);
@@ -3070,9 +3061,9 @@ MYDWORD resad(data9 *req)
 	MYDWORD minRange = 0;
 	MYDWORD maxRange = 0;
 
-	if (req->dhcpp.header.bp_giaddr)
+	if (req->dhcpp.bp_giaddr)
 	{
-		lockIP(req->dhcpp.header.bp_giaddr);
+		lockIP(req->dhcpp.bp_giaddr);
 		lockIP(req->remote.sin_addr.s_addr);
 	}
 
@@ -3116,7 +3107,7 @@ MYDWORD resad(data9 *req)
 				//printf("%s\n", hex2String(tempbuff, rangeSet->macStart[i], rangeSet->macSize[i]));
 				//printf("%s\n", hex2String(tempbuff, rangeSet->macEnd[i], rangeSet->macSize[i]));
 
-				if(memcmp(req->dhcpp.header.bp_chaddr, rangeSet->macStart[i], rangeSet->macSize[i]) >= 0 && memcmp(req->dhcpp.header.bp_chaddr, rangeSet->macEnd[i], rangeSet->macSize[i]) <= 0)
+				if(memcmp(req->dhcpp.bp_chaddr, rangeSet->macStart[i], rangeSet->macSize[i]) >= 0 && memcmp(req->dhcpp.bp_chaddr, rangeSet->macEnd[i], rangeSet->macSize[i]) <= 0)
 				{
 					rangeData.macArray[rangeSetInd] = 1;
 					rangeData.macFound = true;
@@ -3404,15 +3395,15 @@ MYDWORD resad(data9 *req)
 	{
 		if (rangeFound)
 		{
-			if (req->dhcpp.header.bp_giaddr)
-				sprintf(logBuff, "No free leases for DHCPDISCOVER for %s (%s) from RelayAgent %s", req->chaddr, req->hostname, IP2String(req->dhcpp.header.bp_giaddr));
+			if (req->dhcpp.bp_giaddr)
+				sprintf(logBuff, "No free leases for DHCPDISCOVER for %s (%s) from RelayAgent %s", req->chaddr, req->hostname, IP2String(req->dhcpp.bp_giaddr));
 			else
 				sprintf(logBuff, "No free leases for DHCPDISCOVER for %s (%s) from interface %s", req->chaddr, req->hostname, IP2String(network.dhcpConn[req->sockInd].server));
 		}
 		else
 		{
-			if (req->dhcpp.header.bp_giaddr)
-				sprintf(logBuff, "No Matching DHCP Range for DHCPDISCOVER for %s (%s) from RelayAgent %s", req->chaddr, req->hostname, IP2String(req->dhcpp.header.bp_giaddr));
+			if (req->dhcpp.bp_giaddr)
+				sprintf(logBuff, "No Matching DHCP Range for DHCPDISCOVER for %s (%s) from RelayAgent %s", req->chaddr, req->hostname, IP2String(req->dhcpp.bp_giaddr));
 			else
 				sprintf(logBuff, "No Matching DHCP Range for DHCPDISCOVER for %s (%s) from interface %s", req->chaddr, req->hostname, IP2String(network.dhcpConn[req->sockInd].server));
 		}
@@ -3440,9 +3431,9 @@ int sdmess(data9 *req)
 
 	if (req->req_type == DHCP_MESS_NONE)
 	{
-		req->dhcpp.header.bp_yiaddr = chad(req);
+		req->dhcpp.bp_yiaddr = chad(req);
 
-		if (!req->dhcpp.header.bp_yiaddr)
+		if (!req->dhcpp.bp_yiaddr)
 		{
 			if (verbatim || cfig.dhcpLogLevel)
 			{
@@ -3455,9 +3446,9 @@ int sdmess(data9 *req)
 	}
 	else if (req->req_type == DHCP_MESS_DECLINE)
 	{
-		if (req->dhcpp.header.bp_ciaddr && chad(req) == req->dhcpp.header.bp_ciaddr)
+		if (req->dhcpp.bp_ciaddr && chad(req) == req->dhcpp.bp_ciaddr)
 		{
-			lockIP(req->dhcpp.header.bp_ciaddr);
+			lockIP(req->dhcpp.bp_ciaddr);
 
 			req->dhcpEntry->ip = 0;
 			req->dhcpEntry->expiry = INT_MAX;
@@ -3466,7 +3457,7 @@ int sdmess(data9 *req)
 
 			if (verbatim || cfig.dhcpLogLevel)
 			{
-				sprintf(logBuff, "IP Address %s declined by Host %s (%s), locked", IP2String(req->dhcpp.header.bp_ciaddr), req->chaddr, req->hostname);
+				sprintf(logBuff, "IP Address %s declined by Host %s (%s), locked", IP2String(req->dhcpp.bp_ciaddr), req->chaddr, req->hostname);
 				logDHCPMess(logBuff, 1);
 			}
 		}
@@ -3475,7 +3466,7 @@ int sdmess(data9 *req)
 	}
 	else if (req->req_type == DHCP_MESS_RELEASE)
 	{
-		if (req->dhcpp.header.bp_ciaddr && chad(req) == req->dhcpp.header.bp_ciaddr)
+		if (req->dhcpp.bp_ciaddr && chad(req) == req->dhcpp.bp_ciaddr)
 		{
 			req->dhcpEntry->display = false;
 			req->dhcpEntry->local = false;
@@ -3485,7 +3476,7 @@ int sdmess(data9 *req)
 
 			if (verbatim || cfig.dhcpLogLevel)
 			{
-				sprintf(logBuff, "IP Address %s released by Host %s (%s)", IP2String(req->dhcpp.header.bp_ciaddr), req->chaddr, req->hostname);
+				sprintf(logBuff, "IP Address %s released by Host %s (%s)", IP2String(req->dhcpp.bp_ciaddr), req->chaddr, req->hostname);
 				logDHCPMess(logBuff, 1);
 			}
 		}
@@ -3508,16 +3499,16 @@ int sdmess(data9 *req)
 		if (!strcasecmp(req->hostname, cfig.servername))
 			return 0;
 
-		req->dhcpp.header.bp_yiaddr = resad(req);
+		req->dhcpp.bp_yiaddr = resad(req);
 
-		if (!req->dhcpp.header.bp_yiaddr)
+		if (!req->dhcpp.bp_yiaddr)
 			return 0;
 
 		req->resp_type = DHCP_MESS_OFFER;
 	}
 	else if (req->req_type == DHCP_MESS_REQUEST)
 	{
-		//printf("%s\n", IP2String(req->dhcpp.header.bp_ciaddr));
+		//printf("%s\n", IP2String(req->dhcpp.bp_ciaddr));
 		if (req->server)
 		{
 			if (req->server != network.dhcpConn[req->sockInd].server)
@@ -3526,17 +3517,17 @@ int sdmess(data9 *req)
 			if (req->reqIP && req->reqIP == chad(req) && req->dhcpEntry->expiry > t)
 			{
 				req->resp_type = DHCP_MESS_ACK;
-				req->dhcpp.header.bp_yiaddr = req->reqIP;
+				req->dhcpp.bp_yiaddr = req->reqIP;
 			}
-			else if (req->dhcpp.header.bp_ciaddr && req->dhcpp.header.bp_ciaddr == chad(req) && req->dhcpEntry->expiry > t)
+			else if (req->dhcpp.bp_ciaddr && req->dhcpp.bp_ciaddr == chad(req) && req->dhcpEntry->expiry > t)
 			{
 				req->resp_type = DHCP_MESS_ACK;
-				req->dhcpp.header.bp_yiaddr = req->dhcpp.header.bp_ciaddr;
+				req->dhcpp.bp_yiaddr = req->dhcpp.bp_ciaddr;
 			}
 			else
 			{
 				req->resp_type = DHCP_MESS_NAK;
-				req->dhcpp.header.bp_yiaddr = 0;
+				req->dhcpp.bp_yiaddr = 0;
 
 				if (verbatim || cfig.dhcpLogLevel)
 				{
@@ -3547,21 +3538,20 @@ int sdmess(data9 *req)
 				}
 			}
 		}
-		else if (req->dhcpp.header.bp_ciaddr && req->dhcpp.header.bp_ciaddr == chad(req) && req->dhcpEntry->expiry > t)
+		else if (req->dhcpp.bp_ciaddr && req->dhcpp.bp_ciaddr == chad(req) && req->dhcpEntry->expiry > t)
 		{
 			req->resp_type = DHCP_MESS_ACK;
-			req->dhcpp.header.bp_yiaddr = req->dhcpp.header.bp_ciaddr;
+			req->dhcpp.bp_yiaddr = req->dhcpp.bp_ciaddr;
 		}
 		else if (req->reqIP && req->reqIP == chad(req) && req->dhcpEntry->expiry > t)
 		{
 			req->resp_type = DHCP_MESS_ACK;
-			req->dhcpp.header.bp_yiaddr = req->reqIP;
+			req->dhcpp.bp_yiaddr = req->reqIP;
 		}
 		else
 		{
 			req->resp_type = DHCP_MESS_NAK;
-			req->dhcpp.header.bp_yiaddr = 0;
-
+			req->dhcpp.bp_yiaddr = 0;
 			if (verbatim || cfig.dhcpLogLevel)
 			{
 				sprintf(logBuff,
@@ -3580,7 +3570,7 @@ int sdmess(data9 *req)
 	if (req->req_type == DHCP_MESS_NONE)
 		packSize = req->messsize;
 
-	if ((req->dhcpp.header.bp_giaddr || !req->remote.sin_addr.s_addr) && req->dhcpEntry && req->dhcpEntry->rangeInd >= 0)
+	if ((req->dhcpp.bp_giaddr || !req->remote.sin_addr.s_addr) && req->dhcpEntry && req->dhcpEntry->rangeInd >= 0)
 	{
 		MYBYTE rangeSetInd = cfig.dhcpRanges[req->dhcpEntry->rangeInd].rangeSetInd;
 		req->targetIP = cfig.rangeSet[rangeSetInd].targetIP;
@@ -3591,12 +3581,12 @@ int sdmess(data9 *req)
 		req->remote.sin_port = htons(IPPORT_DHCPS);
 		req->remote.sin_addr.s_addr = req->targetIP;
 	}
-	else if (req->dhcpp.header.bp_giaddr)
+	else if (req->dhcpp.bp_giaddr)
 	{
 		req->remote.sin_port = htons(IPPORT_DHCPS);
-		req->remote.sin_addr.s_addr = req->dhcpp.header.bp_giaddr;
+		req->remote.sin_addr.s_addr = req->dhcpp.bp_giaddr;
 	}
-	else if (req->dhcpp.header.bp_broadcast || !req->remote.sin_addr.s_addr || req->reqIP)
+	else if (req->dhcpp.bp_broadcast || !req->remote.sin_addr.s_addr || req->reqIP)
 	{
 		req->remote.sin_port = htons(IPPORT_DHCPC);
 		req->remote.sin_addr.s_addr = INADDR_BROADCAST;
@@ -3606,19 +3596,19 @@ int sdmess(data9 *req)
 		req->remote.sin_port = htons(IPPORT_DHCPC);
 	}
 
-	req->dhcpp.header.bp_op = BOOTP_REPLY;
+	req->dhcpp.bp_op = BOOTP_REPLY;
 
 	req->bytes = packSize;
 
 	int sent = req->sendto(network.dhcpConn[req->sockInd].sock, req->remote,
-		req->req_type == DHCP_MESS_DISCOVER && !req->dhcpp.header.bp_giaddr ?
+		req->req_type == DHCP_MESS_DISCOVER && !req->dhcpp.bp_giaddr ?
 		MSG_DONTROUTE : 0);
 
 	if (sent <= 0)
 		return 0;
 
-	//printf("goes=%s %i\n",IP2String(req->dhcpp.header.bp_yiaddr),req->sockInd);
-	return sent; //req->dhcpp.header.bp_yiaddr;
+	//printf("goes=%s %i\n",IP2String(req->dhcpp.bp_yiaddr),req->sockInd);
+	return sent; //req->dhcpp.bp_yiaddr;
 }
 
 MYDWORD alad(data9 *req)
@@ -3649,19 +3639,19 @@ MYDWORD alad(data9 *req)
 			{
 				sprintf(logBuff, "Host %s (%s = %s) allotted %s for %u seconds",
 					req->chaddr, req->dhcpEntry->hostname, hostname2utf8(req),
-					IP2String(req->dhcpp.header.bp_yiaddr), req->lease);
+					IP2String(req->dhcpp.bp_yiaddr), req->lease);
 			}
 			else if (req->req_type)
 			{
 				sprintf(logBuff, "Host %s (%s = %s) renewed %s for %u seconds",
 					req->chaddr, req->dhcpEntry->hostname, hostname2utf8(req),
-					IP2String(req->dhcpp.header.bp_yiaddr), req->lease);
+					IP2String(req->dhcpp.bp_yiaddr), req->lease);
 			}
 			else
 			{
 				sprintf(logBuff, "BOOTP Host %s (%s = %s) allotted %s",
 					req->chaddr, req->dhcpEntry->hostname, hostname2utf8(req),
-					IP2String(req->dhcpp.header.bp_yiaddr));
+					IP2String(req->dhcpp.bp_yiaddr));
 			}
 			logDHCPMess(logBuff, 1);
 		}
@@ -3675,7 +3665,7 @@ MYDWORD alad(data9 *req)
 	{
 		sprintf(logBuff, "Host %s (%s) offered %s",
 			req->chaddr, hostname2utf8(req),
-			IP2String(req->dhcpp.header.bp_yiaddr));
+			IP2String(req->dhcpp.bp_yiaddr));
 		logDHCPMess(logBuff, 2);
 	}
 	//printf("%u=out\n", req->resp_type);
@@ -3731,7 +3721,7 @@ void addOptions(data9 *req)
 
 	if (req->dhcpEntry && req->resp_type != DHCP_MESS_DECLINE && req->resp_type != DHCP_MESS_NAK)
 	{
-		strcpy(req->dhcpp.header.bp_sname, cfig.servername);
+		strcpy(req->dhcpp.bp_sname, cfig.servername);
 
 		if (req->dhcpEntry->fixed)
 			addOptions(req, req->dhcpEntry->options);
@@ -3777,7 +3767,7 @@ void addOptions(data9 *req)
 			}
 
 			if (!req->hostname[0])
-				genHostName(req->hostname, req->dhcpp.header.bp_chaddr, req->dhcpp.header.bp_hlen);
+				genHostName(req->hostname, req->dhcpp.bp_chaddr, req->dhcpp.bp_hlen);
 
 			updateCachedHostname(req);
 /*
@@ -3856,11 +3846,11 @@ void pvdata(data9 *req, data3 *op)
 	if (!req->opAdded[op->opt_code] && ((req->vp - (MYBYTE*)&req->dhcpp) + op->size < req->messsize))
 	{
 		if (op->opt_code == DHCP_OPTION_NEXTSERVER)
-			req->dhcpp.header.bp_siaddr = fIP(op->value);
+			req->dhcpp.bp_siaddr = fIP(op->value);
 		else if (op->opt_code == DHCP_OPTION_BP_FILE)
 		{
 			if (op->size <= 128)
-				memcpy(req->dhcpp.header.bp_file, op->value, op->size);
+				memcpy(req->dhcpp.bp_file, op->value, op->size);
 		}
 		else if(op->size)
 		{
@@ -4042,7 +4032,7 @@ int sendRepl(data9 *req)
 	char logBuff[1024];
 	data3 op;
 
-	MYBYTE *opPointer = req->dhcpp.vend_data;
+	MYBYTE *opPointer = req->dhcpp.vend_data();
 
 	while ((*opPointer) != DHCP_OPTION_END && opPointer < req->vp)
 	{
@@ -4078,7 +4068,7 @@ int sendRepl(data9 *req)
 	*req->vp++ = DHCP_OPTION_END;
 	req->bytes = req->vp - (MYBYTE*)req->raw;
 
-	req->dhcpp.header.bp_op = BOOTP_REQUEST;
+	req->dhcpp.bp_op = BOOTP_REQUEST;
 
 	int sent = req->sendto(cfig.dhcpReplConn.sock, token.remote);
 
@@ -4118,19 +4108,19 @@ int sendRepl(data7 *dhcpEntry)
 	data9 req;
 	memset(&req, 0, req);
 	req.vp = req.dhcpp.vend_data;
-	req.messsize = sizeof(dhcp_packet);
+	req.messsize = dhcp_header::messsize;
 	req.dhcpEntry = dhcpEntry;
 
-	req.dhcpp.header.bp_op = BOOTP_REQUEST;
-	req.dhcpp.header.bp_xid = t;
-	req.dhcpp.header.bp_ciaddr = dhcpEntry->ip;
-	req.dhcpp.header.bp_yiaddr = dhcpEntry->ip;
-	req.dhcpp.header.bp_hlen = 16;
-	getHexValue(req.dhcpp.header.bp_chaddr, req.dhcpEntry->mapname, &(req.dhcpp.header.bp_hlen));
-	req.dhcpp.header.bp_magic_num[0] = 99;
-	req.dhcpp.header.bp_magic_num[1] = 130;
-	req.dhcpp.header.bp_magic_num[2] = 83;
-	req.dhcpp.header.bp_magic_num[3] = 99;
+	req.dhcpp.bp_op = BOOTP_REQUEST;
+	req.dhcpp.bp_xid = t;
+	req.dhcpp.bp_ciaddr = dhcpEntry->ip;
+	req.dhcpp.bp_yiaddr = dhcpEntry->ip;
+	req.dhcpp.bp_hlen = 16;
+	getHexValue(req.dhcpp.bp_chaddr, req.dhcpEntry->mapname, &(req.dhcpp.bp_hlen));
+	req.dhcpp.bp_magic_num[0] = 99;
+	req.dhcpp.bp_magic_num[1] = 130;
+	req.dhcpp.bp_magic_num[2] = 83;
+	req.dhcpp.bp_magic_num[3] = 99;
 	strcpy(req.hostname, dhcpEntry->hostname);
 
 	return sendRepl(&req);
@@ -4142,9 +4132,9 @@ void recvRepl(data9 *req)
 	char logBuff[1024];
 	cfig.dhcpRepl = t + 600;
 
-	MYDWORD ip = req->dhcpp.header.bp_yiaddr ? req->dhcpp.header.bp_yiaddr : req->dhcpp.header.bp_ciaddr;
+	MYDWORD ip = req->dhcpp.bp_yiaddr ? req->dhcpp.bp_yiaddr : req->dhcpp.bp_ciaddr;
 
-	if (!ip || !req->dhcpp.header.bp_hlen)
+	if (!ip || !req->dhcpp.bp_hlen)
 	{
 //		if (verbatim || cfig.dhcpLogLevel >= 2)
 //		{
@@ -4569,7 +4559,7 @@ bool loadOptions(FILE *f, const char *sectionName, data20 *optionData)
 
 		op_specified[opTag] = true;
 
-		const size_t buffsize = optionData->options + sizeof(dhcp_packet) - dp - sizeof(dhcp_header);
+		const size_t buffsize = optionData->options + dhcp_header::messsize - dp - sizeof(dhcp_header);
 
 		if (valType == 9)
 		{
@@ -6233,10 +6223,10 @@ MYDWORD getSerial(const char *zone)
 		req.remote.sin_addr.s_addr = cfig.zoneServers[1];
 
 	req.sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	req.dnsp = (dnsPacket*)req.raw;
-	req.dnsp->header.qdcount = htons(1);
-	req.dnsp->header.xid = (t % USHRT_MAX);
-	req.dp = &req.dnsp->data;
+	req.dnsp = (dnsHeader*)req.raw;
+	req.dnsp->qdcount = htons(1);
+	req.dnsp->xid = (t % USHRT_MAX);
+	req.dp = req.dnsp->data();
 	req.dp += pQu(req.dp, zone);
 	req.dp += pUShort(req.dp, DNS_TYPE_SOA);
 	req.dp += pUShort(req.dp, DNS_CLASS_IN);
@@ -6264,18 +6254,18 @@ MYDWORD getSerial(const char *zone)
 	if (FD_ISSET(req.sock, &readfds1))
 	{
 		if (req.recvfrom(req.sock) > 0 &&
-			req.dnsp->header.qr &&
-			!req.dnsp->header.rcode &&
-			ntohs(req.dnsp->header.ancount))
+			req.dnsp->qr &&
+			!req.dnsp->rcode &&
+			ntohs(req.dnsp->ancount))
 		{
-			req.dp = &req.dnsp->data;
-			for (int j = 1; j <= ntohs(req.dnsp->header.qdcount); j++)
+			req.dp = req.dnsp->data();
+			for (int j = 1; j <= ntohs(req.dnsp->qdcount); j++)
 			{
 				req.dp += fQu(tempbuff, req.dnsp, req.dp);
 				req.dp += 4;
 			}
 
-			for (int i = 1; i <= ntohs(req.dnsp->header.ancount); i++)
+			for (int i = 1; i <= ntohs(req.dnsp->ancount); i++)
 			{
 				req.dp += fQu(tempbuff, req.dnsp, req.dp);
 				req.qtype = fUShort(req.dp);
@@ -6313,10 +6303,10 @@ MYDWORD getSerial(const char *zone)
 
 	req.sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
-	req.dnsp = (dnsPacket*)req.raw;
-	req.dnsp->header.qdcount = htons(1);
-	req.dnsp->header.xid = (t % USHRT_MAX);
-	req.dp = &req.dnsp->data;
+	req.dnsp = (dnsHeader*)req.raw;
+	req.dnsp->qdcount = htons(1);
+	req.dnsp->xid = (t % USHRT_MAX);
+	req.dp = req.dnsp->data();
 	IP2String(htonl(ip), tempbuff);
 	strcat(tempbuff, arpa);
 	req.dp += pQu(req.dp, tempbuff);
@@ -6341,7 +6331,7 @@ MYDWORD getSerial(const char *zone)
 	{
 		req.sockLen = sizeof(req.remote);
 		req.bytes = recvfrom(req.sock, req.raw, sizeof(req.raw), 0, (sockaddr*)&req.remote, &req.sockLen);
-		if (req.bytes > 0 && req.dnsp->header.qr && !req.dnsp->header.rcode && ntohs(req.dnsp->header.ancount))
+		if (req.bytes > 0 && req.dnsp->qr && !req.dnsp->rcode && ntohs(req.dnsp->ancount))
 		{
 			closesocket(req.sock);
 			return getResult(&req);
@@ -6563,10 +6553,10 @@ MYDWORD getZone(MYBYTE updateCache, char *zone)
 	{
 		req.dp = req.raw;
 		req.dp += 2;
-		req.dnsp = (dnsPacket*)req.dp;
-		req.dnsp->header.qdcount = htons(1);
-		req.dnsp->header.xid = (t % USHRT_MAX);
-		req.dp = &req.dnsp->data;
+		req.dnsp = (dnsHeader*)req.dp;
+		req.dnsp->qdcount = htons(1);
+		req.dnsp->xid = (t % USHRT_MAX);
+		req.dp = req.dnsp->data();
 		req.dp += pQu(req.dp, zone);
 		req.dp += pUShort(req.dp, DNS_TYPE_AXFR);
 		req.dp += pUShort(req.dp, DNS_CLASS_IN);
@@ -6594,19 +6584,19 @@ MYDWORD getZone(MYBYTE updateCache, char *zone)
 			if ((MYWORD)req.bytes < pktSize + 2)
 				break;
 
-			req.dnsp = (dnsPacket*)(req.raw + 2);
-			req.dp = &req.dnsp->data;
+			req.dnsp = (dnsHeader*)(req.raw + 2);
+			req.dp = req.dnsp->data();
 
-			if (!req.dnsp->header.qr || req.dnsp->header.rcode || !ntohs(req.dnsp->header.ancount))
+			if (!req.dnsp->qr || req.dnsp->rcode || !ntohs(req.dnsp->ancount))
 				break;
 
-			for (int j = 1; j <= ntohs(req.dnsp->header.qdcount); j++)
+			for (int j = 1; j <= ntohs(req.dnsp->qdcount); j++)
 			{
 				req.dp += fQu(hostname, req.dnsp, req.dp);
 				req.dp += 4;
 			}
 
-			for (int i = 1; i <= ntohs(req.dnsp->header.ancount); i++)
+			for (int i = 1; i <= ntohs(req.dnsp->ancount); i++)
 			{
 				//char *dp = req.dp;
 				req.dp += fQu(hostname, req.dnsp, req.dp);
@@ -6836,10 +6826,10 @@ bool getSecondary()
 	{
 		req.dp = req.raw;
 		req.dp += 2;
-		req.dnsp = (dnsPacket*)req.dp;
-		req.dnsp->header.qdcount = htons(1);
-		req.dnsp->header.xid = (t % USHRT_MAX);
-		req.dp = &req.dnsp->data;
+		req.dnsp = (dnsHeader*)req.dp;
+		req.dnsp->qdcount = htons(1);
+		req.dnsp->xid = (t % USHRT_MAX);
+		req.dp = req.dnsp->data();
 		req.dp += pQu(req.dp, cfig.authority);
 		req.dp += pUShort(req.dp, DNS_TYPE_AXFR);
 		req.dp += pUShort(req.dp, DNS_CLASS_IN);
@@ -6865,19 +6855,19 @@ bool getSecondary()
 			if ((MYWORD)req.bytes < pktSize + 2)
 				break;
 
-			req.dnsp = (dnsPacket*)(req.raw + 2);
-			req.dp = &req.dnsp->data;
+			req.dnsp = (dnsHeader*)(req.raw + 2);
+			req.dp = req.dnsp->data();
 
-			if (!req.dnsp->header.qr || req.dnsp->header.rcode || !ntohs(req.dnsp->header.ancount))
+			if (!req.dnsp->qr || req.dnsp->rcode || !ntohs(req.dnsp->ancount))
 				break;
 
-			for (int j = 1; j <= ntohs(req.dnsp->header.qdcount); j++)
+			for (int j = 1; j <= ntohs(req.dnsp->qdcount); j++)
 			{
 				req.dp += fQu(hostname, req.dnsp, req.dp);
 				req.dp += 4;
 			}
 
-			for (int i = 1; i <= ntohs(req.dnsp->header.ancount); i++)
+			for (int i = 1; i <= ntohs(req.dnsp->ancount); i++)
 			{
 				//char *dp = req.dp;
 				req.dp += fQu(hostname, req.dnsp, req.dp);
@@ -7953,8 +7943,8 @@ int runProg()
 
 					data3 op;
 					memset(&token, 0, sizeof token);
-					token.vp = token.dhcpp.vend_data;
-					token.messsize = sizeof(dhcp_packet);
+					token.vp = token.dhcpp.vend_data();
+					token.messsize = dhcp_header::messsize;
 
 					token.remote.sin_port = htons(IPPORT_DHCPS);
 					token.remote.sin_family = AF_INET;
@@ -7964,12 +7954,12 @@ int runProg()
 					else if (cfig.replication == 2)
 						token.remote.sin_addr.s_addr = cfig.zoneServers[0];
 
-					token.dhcpp.header.bp_op = BOOTP_REQUEST;
-					token.dhcpp.header.bp_xid = t;
-					token.dhcpp.header.bp_magic_num[0] = 99;
-					token.dhcpp.header.bp_magic_num[1] = 130;
-					token.dhcpp.header.bp_magic_num[2] = 83;
-					token.dhcpp.header.bp_magic_num[3] = 99;
+					token.dhcpp.bp_op = BOOTP_REQUEST;
+					token.dhcpp.bp_xid = t;
+					token.dhcpp.bp_magic_num[0] = 99;
+					token.dhcpp.bp_magic_num[1] = 130;
+					token.dhcpp.bp_magic_num[2] = 83;
+					token.dhcpp.bp_magic_num[3] = 99;
 
 					op.opt_code = DHCP_OPTION_MESSAGETYPE;
 					op.size = 1;
@@ -8875,21 +8865,16 @@ bool gdmess(data9 *req, MYBYTE sockInd)
 	req->sockInd = sockInd;
 	req->sockLen = sizeof(req->remote);
 
-	req->bytes = recvfrom(network.dhcpConn[req->sockInd].sock,
-	                      req->raw,
-	                      sizeof(req->raw),
-	                      0,
-	                      (sockaddr*)&req->remote,
-	                      &req->sockLen);
+	req->recvfrom(network.dhcpConn[req->sockInd].sock);
 
 	//printf("IP=%s bytes=%u\n", IP2String(tempbuff,req->remote.sin_addr.s_addr), req->bytes);
 
-	if (req->bytes <= 0 || req->dhcpp.header.bp_op != BOOTP_REQUEST)
+	if (req->bytes <= 0 || req->dhcpp.bp_op != BOOTP_REQUEST)
 		return false;
 
-	hex2String(req->chaddr, req->dhcpp.header.bp_chaddr, req->dhcpp.header.bp_hlen);
+	hex2String(req->chaddr, req->dhcpp.bp_chaddr, req->dhcpp.bp_hlen);
 
-	MYBYTE *raw = req->dhcpp.vend_data;
+	MYBYTE *raw = req->dhcpp.vend_data();
 	MYBYTE *rawEnd = raw + (req->bytes - sizeof(dhcp_header));
 
 	for (; raw < rawEnd && *raw != DHCP_OPTION_END;)
@@ -8980,8 +8965,8 @@ bool gdmess(data9 *req, MYBYTE sockInd)
 
 	if (!req->subnetIP)
 	{
-		if (req->dhcpp.header.bp_giaddr)
-			req->subnetIP = req->dhcpp.header.bp_giaddr;
+		if (req->dhcpp.bp_giaddr)
+			req->subnetIP = req->dhcpp.bp_giaddr;
 		else
 			req->subnetIP = network.dhcpConn[req->sockInd].server;
 	}
@@ -8991,7 +8976,7 @@ bool gdmess(data9 *req, MYBYTE sockInd)
 		if (req->req_type == DHCP_MESS_NONE)
 			req->messsize = static_cast<MYWORD>(req->bytes);
 		else
-			req->messsize = sizeof(dhcp_packet);
+			req->messsize = dhcp_header::messsize;
 	}
 
 	if ((req->req_type == 1 || req->req_type == 3) && cfig.dhcpLogLevel == 3)
@@ -9003,12 +8988,12 @@ bool gdmess(data9 *req, MYBYTE sockInd)
 	{
 		if (req->req_type == DHCP_MESS_NONE)
 		{
-			if (req->dhcpp.header.bp_giaddr)
+			if (req->dhcpp.bp_giaddr)
 			{
 				sprintf(logBuff,
 					"BOOTPREQUEST for %s (%s) from RelayAgent %s received",
 					req->chaddr, hostname2utf8(req),
-					IP2String(req->dhcpp.header.bp_giaddr));
+					IP2String(req->dhcpp.bp_giaddr));
 			}
 			else
 			{
@@ -9021,12 +9006,12 @@ bool gdmess(data9 *req, MYBYTE sockInd)
 		}
 		else if (req->req_type == DHCP_MESS_DISCOVER)
 		{
-			if (req->dhcpp.header.bp_giaddr)
+			if (req->dhcpp.bp_giaddr)
 			{
 				sprintf(logBuff,
 					"DHCPDISCOVER for %s (%s) from RelayAgent %s received",
 					req->chaddr, hostname2utf8(req),
-					IP2String(req->dhcpp.header.bp_giaddr));
+					IP2String(req->dhcpp.bp_giaddr));
 			}
 			else
 			{
@@ -9039,12 +9024,12 @@ bool gdmess(data9 *req, MYBYTE sockInd)
 		}
 		else if (req->req_type == DHCP_MESS_REQUEST)
 		{
-			if (req->dhcpp.header.bp_giaddr)
+			if (req->dhcpp.bp_giaddr)
 			{
 				sprintf(logBuff,
 					"DHCPREQUEST for %s (%s) from RelayAgent %s received",
 					req->chaddr, hostname2utf8(req),
-					IP2String(req->dhcpp.header.bp_giaddr));
+					IP2String(req->dhcpp.bp_giaddr));
 			}
 			else
 			{
@@ -9057,8 +9042,8 @@ bool gdmess(data9 *req, MYBYTE sockInd)
 		}
 	}
 
-	req->vp = req->dhcpp.vend_data;
-	memset(req->vp, 0, sizeof(dhcp_packet) - sizeof(dhcp_header));
+	req->vp = req->dhcpp.vend_data();
+	memset(req->vp, 0, dhcp_header::messsize - sizeof(dhcp_header));
 	//printf("end bytes=%u\n", req->bytes);
 	return true;
 }
@@ -9068,11 +9053,11 @@ void debug(const char *mess)
 	logMess(mess, 1);
 }
 
-void logDebug(const data9 *req)
+void logDebug(data9 *req)
 {
 	char localBuff[1024];
 	char path[_MAX_PATH];
-	genHostName(localBuff, req->dhcpp.header.bp_chaddr, req->dhcpp.header.bp_hlen);
+	genHostName(localBuff, req->dhcpp.bp_chaddr, req->dhcpp.bp_hlen);
 	sprintf(path, cliFile, localBuff);
 	if (FILE *f = fopen(path, "at"))
 	{
@@ -9082,12 +9067,12 @@ void logDebug(const data9 *req)
 		char *s = localBuff;
 		s += sprintf(s, path);
 		s += sprintf(s, " SourceMac=%s", req->chaddr);
-		s += sprintf(s, " ClientIP=%s", IP2String(req->dhcpp.header.bp_ciaddr));
+		s += sprintf(s, " ClientIP=%s", IP2String(req->dhcpp.bp_ciaddr));
 		s += sprintf(s, " SourceIP=%s", IP2String(req->remote.sin_addr.s_addr));
-		s += sprintf(s, " RelayAgent=%s", IP2String(req->dhcpp.header.bp_giaddr));
+		s += sprintf(s, " RelayAgent=%s", IP2String(req->dhcpp.bp_giaddr));
 		fprintf(f, "%s\n", localBuff);
 
-		const MYBYTE *raw = req->dhcpp.vend_data;
+		const MYBYTE *raw = req->dhcpp.vend_data();
 		const MYBYTE *rawEnd = raw + (req->bytes - sizeof(dhcp_header));
 
 		for (; raw < rawEnd && *raw != DHCP_OPTION_END;)

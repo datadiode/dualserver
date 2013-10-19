@@ -39,34 +39,34 @@ const char sVersion[] = "Dual DHCP DNS Server Version 7.11p Windows Build 0001";
 
 using namespace eastl;
 
-uintptr_t BeginThread(void (__cdecl *entrypoint)(void *), unsigned stacksize, void *param);
+uintptr_t BeginThread(void (__cdecl *)(void *), unsigned, void *);
 void EndThread();
 
-#define MAX_SERVERS 125
-#define MAX_DHCP_RANGES 125
-#define MAX_DNS_RANGES 32
-#define MAX_RANGE_SETS 125
-#define MAX_RANGE_FILTERS 32
-#define MAX_COND_FORW 125
-#define MAX_TCP_CLIENTS 16
-#define MAX_WILD_HOSTS 125
+#define MAX_SERVERS			125
+#define MAX_DHCP_RANGES		125
+#define MAX_DNS_RANGES		32
+#define MAX_RANGE_SETS		125
+#define MAX_RANGE_FILTERS	32
+#define MAX_COND_FORW		125
+#define MAX_TCP_CLIENTS		16
+#define MAX_WILD_HOSTS		125
 
-#define RCODE_NOERROR 		0
+#define RCODE_NOERROR		0
 #define RCODE_FORMATERROR	1
 #define RCODE_SERVERFAIL	2
 #define RCODE_NAMEERROR		3
-#define RCODE_NOTIMPL 		4
-#define RCODE_REFUSED 		5
-#define RCODE_YXDOMAIN 		6
-#define RCODE_YXRRSET 		7
-#define RCODE_NXRRSET 		8
-#define RCODE_NOTAUTH 		9
-#define RCODE_NOTZONE 		10
+#define RCODE_NOTIMPL		4
+#define RCODE_REFUSED		5
+#define RCODE_YXDOMAIN		6
+#define RCODE_YXRRSET		7
+#define RCODE_NXRRSET		8
+#define RCODE_NOTAUTH		9
+#define RCODE_NOTZONE		10
 
 #define OPCODE_STANDARD_QUERY	0
 #define OPCODE_INVERSE_QUERY	1
 #define OPCODE_SRVR_STAT_REQ	2
-#define OPCODE_NOTIFY	4
+#define OPCODE_NOTIFY			4
 #define OPCODE_DYNAMIC_UPDATE	5
 
 #define DNS_TYPE_A		1
@@ -121,45 +121,10 @@ struct dnsHeader
 	unsigned ancount: 16;	//number of answer entries
 	unsigned nscount: 16;	//number of authority entries
 	unsigned adcount: 16;	//number of additional entries
-};
-
-/*
-struct dnsHeader
-{
-	unsigned xid :16;	// query identification number
-	unsigned qr: 1;		// response flag
-	unsigned opcode: 4;	// purpose of message
-	unsigned aa: 1;		// authoritive answer
-	unsigned tc: 1;		// truncated message
-	unsigned rd: 1;		// recursion desired
-	// byte boundry 	// fields in fourth byte
-	unsigned ra: 1;		// recursion available
-	unsigned unused :1;	// unused bits (MBZ as of 4.9.3a3)
-	unsigned at: 1;		// authentic data from named
-	unsigned cd: 1;		// checking disabled by resolver
-	unsigned rcode :4;	// response code
-	// byte boundry 	// remaining bytes
-	union {
-		struct {
-			MYWORD qdcount;
-			MYWORD ancount;
-			MYWORD nscount;
-			MYWORD adcount;
-		};
-		struct {
-			MYWORD zcount;
-			MYWORD prcount;
-			MYWORD ucount;
-			MYWORD arcount;
-		};
-	};
-};
-*/
-
-struct dnsPacket
-{
-	struct dnsHeader header;
-	char data;
+	char *data()
+	{
+		return reinterpret_cast<char *>(this + 1);
+	}
 };
 
 struct data6
@@ -242,7 +207,7 @@ typedef multimap<time_t, data7*> expiryMap;
 
 struct data5 //dns request
 {
-	dnsPacket *dnsp;
+	dnsHeader *dnsp;
 	char *dp;
 	char raw[2048];
 	char temp[2048];
@@ -345,107 +310,107 @@ struct ConnType
 	bool ready;
 };
 
-#define BOOTP_REQUEST  1
-#define BOOTP_REPLY    2
+#define BOOTP_REQUEST	1
+#define BOOTP_REPLY		2
 
-#define DHCP_MESS_NONE       0
-#define DHCP_MESS_DISCOVER   1
-#define DHCP_MESS_OFFER      2
-#define DHCP_MESS_REQUEST	 3
-#define DHCP_MESS_DECLINE	 4
-#define DHCP_MESS_ACK		 5
-#define DHCP_MESS_NAK		 6
-#define DHCP_MESS_RELEASE    7
-#define DHCP_MESS_INFORM	 8
+#define DHCP_MESS_NONE		0
+#define DHCP_MESS_DISCOVER	1
+#define DHCP_MESS_OFFER		2
+#define DHCP_MESS_REQUEST	3
+#define DHCP_MESS_DECLINE	4
+#define DHCP_MESS_ACK		5
+#define DHCP_MESS_NAK		6
+#define DHCP_MESS_RELEASE	7
+#define DHCP_MESS_INFORM	8
 
 
 // DHCP OPTIONS
 #define DHCP_OPTION_PAD						0
-#define DHCP_OPTION_NETMASK          		1
-#define DHCP_OPTION_TIMEOFFSET       		2
-#define DHCP_OPTION_ROUTER           		3
-#define DHCP_OPTION_TIMESERVER       		4
-#define DHCP_OPTION_NAMESERVER       		5
-#define DHCP_OPTION_DNS              		6
-#define DHCP_OPTION_LOGSERVER        		7
-#define DHCP_OPTION_COOKIESERVER     		8
-#define DHCP_OPTION_LPRSERVER        		9
-#define DHCP_OPTION_IMPRESSSERVER    		10
-#define DHCP_OPTION_RESLOCSERVER     		11
-#define DHCP_OPTION_HOSTNAME         		12
-#define DHCP_OPTION_BOOTFILESIZE     		13
-#define DHCP_OPTION_MERITDUMP        		14
-#define DHCP_OPTION_DOMAINNAME       		15
-#define DHCP_OPTION_SWAPSERVER       		16
-#define DHCP_OPTION_ROOTPATH         		17
-#define DHCP_OPTION_EXTSPATH         		18
-#define DHCP_OPTION_IPFORWARD        		19
-#define DHCP_OPTION_NONLOCALSR       		20
-#define DHCP_OPTION_POLICYFILTER     		21
-#define DHCP_OPTION_MAXREASSEMBLE    		22
-#define DHCP_OPTION_IPTTL            		23
-#define DHCP_OPTION_PATHMTUAGING     		24
-#define DHCP_OPTION_PATHMTUPLATEAU   		25
-#define DHCP_OPTION_INTERFACEMTU     		26
-#define DHCP_OPTION_SUBNETSLOCAL     		27
-#define DHCP_OPTION_BCASTADDRESS     		28
-#define DHCP_OPTION_MASKDISCOVERY    		29
-#define DHCP_OPTION_MASKSUPPLIER     		30
-#define DHCP_OPTION_ROUTERDISCOVERY  		31
-#define DHCP_OPTION_ROUTERSOLIC      		32
-#define DHCP_OPTION_STATICROUTE      		33
-#define DHCP_OPTION_TRAILERENCAPS    		34
-#define DHCP_OPTION_ARPTIMEOUT       		35
-#define DHCP_OPTION_ETHERNETENCAPS   		36
-#define DHCP_OPTION_TCPTTL           		37
-#define DHCP_OPTION_TCPKEEPALIVEINT  		38
-#define DHCP_OPTION_TCPKEEPALIVEGRBG 		39
-#define DHCP_OPTION_NISDOMAIN        		40
-#define DHCP_OPTION_NISSERVERS       		41
-#define DHCP_OPTION_NTPSERVERS       		42
-#define DHCP_OPTION_VENDORSPECIFIC   		43
-#define DHCP_OPTION_NETBIOSNAMESERV  		44
-#define DHCP_OPTION_NETBIOSDGDIST    		45
-#define DHCP_OPTION_NETBIOSNODETYPE  		46
-#define DHCP_OPTION_NETBIOSSCOPE     		47
-#define DHCP_OPTION_X11FONTS         		48
-#define DHCP_OPTION_X11DISPLAYMNGR   		49
-#define DHCP_OPTION_REQUESTEDIPADDR  		50
-#define DHCP_OPTION_IPADDRLEASE      		51
-#define DHCP_OPTION_OVERLOAD         		52
-#define DHCP_OPTION_MESSAGETYPE      		53
-#define DHCP_OPTION_SERVERID         		54
-#define DHCP_OPTION_PARAMREQLIST     		55
-#define DHCP_OPTION_MESSAGE          		56
-#define DHCP_OPTION_MAXDHCPMSGSIZE   		57
-#define DHCP_OPTION_RENEWALTIME      		58
-#define DHCP_OPTION_REBINDINGTIME    		59
-#define DHCP_OPTION_VENDORCLASSID    		60
-#define DHCP_OPTION_CLIENTID         		61
-#define DHCP_OPTION_NETWARE_IPDOMAIN        62
-#define DHCP_OPTION_NETWARE_IPOPTION        63
-#define DHCP_OPTION_NISPLUSDOMAIN    		64
-#define DHCP_OPTION_NISPLUSSERVERS   		65
-#define DHCP_OPTION_TFTPSERVER       		66
-#define DHCP_OPTION_BOOTFILE         		67
-#define DHCP_OPTION_MOBILEIPHOME     		68
-#define DHCP_OPTION_SMTPSERVER       		69
-#define DHCP_OPTION_POP3SERVER       		70
-#define DHCP_OPTION_NNTPSERVER       		71
-#define DHCP_OPTION_WWWSERVER        		72
-#define DHCP_OPTION_FINGERSERVER     		73
-#define DHCP_OPTION_IRCSERVER        		74
-#define DHCP_OPTION_STSERVER         		75
-#define DHCP_OPTION_STDASERVER       		76
-#define DHCP_OPTION_USERCLASS        		77
-#define DHCP_OPTION_SLPDIRAGENT      		78
-#define DHCP_OPTION_SLPDIRSCOPE      		79
-#define DHCP_OPTION_CLIENTFQDN       		81
-#define DHCP_OPTION_RELAYAGENTINFO     		82
-#define DHCP_OPTION_I_SNS     				83
-#define DHCP_OPTION_NDSSERVERS       		85
-#define DHCP_OPTION_NDSTREENAME      		86
-#define DHCP_OPTION_NDSCONTEXT		 		87
+#define DHCP_OPTION_NETMASK					1
+#define DHCP_OPTION_TIMEOFFSET				2
+#define DHCP_OPTION_ROUTER					3
+#define DHCP_OPTION_TIMESERVER				4
+#define DHCP_OPTION_NAMESERVER				5
+#define DHCP_OPTION_DNS						6
+#define DHCP_OPTION_LOGSERVER				7
+#define DHCP_OPTION_COOKIESERVER			8
+#define DHCP_OPTION_LPRSERVER				9
+#define DHCP_OPTION_IMPRESSSERVER			10
+#define DHCP_OPTION_RESLOCSERVER			11
+#define DHCP_OPTION_HOSTNAME				12
+#define DHCP_OPTION_BOOTFILESIZE			13
+#define DHCP_OPTION_MERITDUMP				14
+#define DHCP_OPTION_DOMAINNAME				15
+#define DHCP_OPTION_SWAPSERVER				16
+#define DHCP_OPTION_ROOTPATH				17
+#define DHCP_OPTION_EXTSPATH				18
+#define DHCP_OPTION_IPFORWARD				19
+#define DHCP_OPTION_NONLOCALSR				20
+#define DHCP_OPTION_POLICYFILTER			21
+#define DHCP_OPTION_MAXREASSEMBLE			22
+#define DHCP_OPTION_IPTTL					23
+#define DHCP_OPTION_PATHMTUAGING			24
+#define DHCP_OPTION_PATHMTUPLATEAU			25
+#define DHCP_OPTION_INTERFACEMTU			26
+#define DHCP_OPTION_SUBNETSLOCAL			27
+#define DHCP_OPTION_BCASTADDRESS			28
+#define DHCP_OPTION_MASKDISCOVERY			29
+#define DHCP_OPTION_MASKSUPPLIER			30
+#define DHCP_OPTION_ROUTERDISCOVERY			31
+#define DHCP_OPTION_ROUTERSOLIC				32
+#define DHCP_OPTION_STATICROUTE				33
+#define DHCP_OPTION_TRAILERENCAPS			34
+#define DHCP_OPTION_ARPTIMEOUT				35
+#define DHCP_OPTION_ETHERNETENCAPS			36
+#define DHCP_OPTION_TCPTTL					37
+#define DHCP_OPTION_TCPKEEPALIVEINT			38
+#define DHCP_OPTION_TCPKEEPALIVEGRBG		39
+#define DHCP_OPTION_NISDOMAIN				40
+#define DHCP_OPTION_NISSERVERS				41
+#define DHCP_OPTION_NTPSERVERS				42
+#define DHCP_OPTION_VENDORSPECIFIC			43
+#define DHCP_OPTION_NETBIOSNAMESERV			44
+#define DHCP_OPTION_NETBIOSDGDIST			45
+#define DHCP_OPTION_NETBIOSNODETYPE			46
+#define DHCP_OPTION_NETBIOSSCOPE			47
+#define DHCP_OPTION_X11FONTS				48
+#define DHCP_OPTION_X11DISPLAYMNGR			49
+#define DHCP_OPTION_REQUESTEDIPADDR			50
+#define DHCP_OPTION_IPADDRLEASE				51
+#define DHCP_OPTION_OVERLOAD				52
+#define DHCP_OPTION_MESSAGETYPE				53
+#define DHCP_OPTION_SERVERID				54
+#define DHCP_OPTION_PARAMREQLIST			55
+#define DHCP_OPTION_MESSAGE					56
+#define DHCP_OPTION_MAXDHCPMSGSIZE			57
+#define DHCP_OPTION_RENEWALTIME				58
+#define DHCP_OPTION_REBINDINGTIME			59
+#define DHCP_OPTION_VENDORCLASSID			60
+#define DHCP_OPTION_CLIENTID				61
+#define DHCP_OPTION_NETWARE_IPDOMAIN		62
+#define DHCP_OPTION_NETWARE_IPOPTION		63
+#define DHCP_OPTION_NISPLUSDOMAIN			64
+#define DHCP_OPTION_NISPLUSSERVERS			65
+#define DHCP_OPTION_TFTPSERVER				66
+#define DHCP_OPTION_BOOTFILE				67
+#define DHCP_OPTION_MOBILEIPHOME			68
+#define DHCP_OPTION_SMTPSERVER				69
+#define DHCP_OPTION_POP3SERVER				70
+#define DHCP_OPTION_NNTPSERVER				71
+#define DHCP_OPTION_WWWSERVER				72
+#define DHCP_OPTION_FINGERSERVER			73
+#define DHCP_OPTION_IRCSERVER				74
+#define DHCP_OPTION_STSERVER				75
+#define DHCP_OPTION_STDASERVER				76
+#define DHCP_OPTION_USERCLASS				77
+#define DHCP_OPTION_SLPDIRAGENT				78
+#define DHCP_OPTION_SLPDIRSCOPE				79
+#define DHCP_OPTION_CLIENTFQDN				81
+#define DHCP_OPTION_RELAYAGENTINFO			82
+#define DHCP_OPTION_I_SNS					83
+#define DHCP_OPTION_NDSSERVERS				85
+#define DHCP_OPTION_NDSTREENAME				86
+#define DHCP_OPTION_NDSCONTEXT				87
 #define DHCP_OPTION_AUTHENTICATION			90
 #define DHCP_OPTION_CLIENTSYSTEM			93
 #define DHCP_OPTION_CLIENTNDI				94
@@ -480,16 +445,16 @@ struct ConnType
 #define DHCP_OPTION_NEXTSERVER				254
 #define DHCP_OPTION_END						255
 
-//#define DHCP_VENDORDATA_SIZE		 272
-//#define DHCP_VENDORDATA_SIZE		 64
-//#define DHCP_VENDORDATA_SIZE		 784
+//#define DHCP_VENDORDATA_SIZE		272
+//#define DHCP_VENDORDATA_SIZE		64
+//#define DHCP_VENDORDATA_SIZE		784
 //#define DHCP_PACKET_SIZE			1024
-//#define DHCP_MIN_SIZE				 44
-//#define DHCP_MAX_CLIENTS			 254
-#define IPPORT_DHCPS   67
-#define IPPORT_DHCPC   68
-#define VM_STANFORD  0x5354414EUL
-#define VM_RFC1048   0x63825363UL
+//#define DHCP_MIN_SIZE				44
+//#define DHCP_MAX_CLIENTS			254
+#define IPPORT_DHCPS	67
+#define IPPORT_DHCPC	68
+#define VM_STANFORD		0x5354414EUL
+#define VM_RFC1048		0x63825363UL
 
 struct data3
 {
@@ -500,6 +465,7 @@ struct data3
 
 struct dhcp_header
 {
+	static const MYWORD messsize = 1024;
 	MYBYTE bp_op;
 	MYBYTE bp_htype;
 	MYBYTE bp_hlen;
@@ -520,12 +486,11 @@ struct dhcp_header
 	char bp_sname[64];
 	MYBYTE bp_file[128];
 	MYBYTE bp_magic_num[4];
-};
 
-struct dhcp_packet
-{
-	dhcp_header header;
-	MYBYTE vend_data[1024 - sizeof(dhcp_header)];
+	MYBYTE *vend_data()
+	{
+		return reinterpret_cast<MYBYTE *>(this + 1);
+	}
 };
 
 struct data13 //dhcp range
@@ -567,7 +532,7 @@ struct data17
 
 struct data20
 {
-	MYBYTE options[sizeof(dhcp_packet)];
+	MYBYTE options[dhcp_header::messsize];
 	MYWORD optionSize;
 	MYWORD codepage;
 	MYDWORD ip;
@@ -580,8 +545,8 @@ struct data9 //dhcpRequst
 	MYDWORD lease;
 	union
 	{
-		char raw[sizeof(dhcp_packet)];
-		dhcp_packet dhcpp;
+		char raw[dhcp_header::messsize];
+		dhcp_header dhcpp;
 	};
 	char hostname[256];
 	char chaddr[64];
@@ -836,7 +801,7 @@ void checkDNS(MYBYTE);
 void closeConn();
 void delDnsEntry(MYBYTE, data7*);
 void getInterfaces(FILE*);
-void logDebug(const data9*);
+void logDebug(data9*);
 bool lockOptions(FILE*, const char*);
 bool loadOptions(FILE*, const char*, data20*);
 void logThread(const char *);
@@ -862,7 +827,7 @@ void setLeaseExpiry(data7*, MYDWORD);
 void updateDNS(data9*);
 void updateStateFile(data7*);
 int fdnmess(data5*);
-MYWORD fQu(char*, dnsPacket*, char*);
+MYWORD fQu(char*, dnsHeader*, char*);
 bool frdnmess(data5*);
 MYWORD fUShort(void*);
 char *hostname2utf8(data9*, char* = array<char, 512>().data);
