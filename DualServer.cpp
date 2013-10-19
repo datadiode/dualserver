@@ -626,21 +626,20 @@ void __cdecl serverloop(void *)
 	EndThread();
 }
 
-char *AnsiToPunycode(const char *hostname, unsigned codepage)
+const char *AnsiToPunycode(const char *hostname, unsigned codepage, char *punycode)
 {
 	if (codepage != 0)
 	{
 		WCHAR utf16[512];
-		char punycode[512];
 		int cch = MultiByteToWideChar(codepage, 0, hostname, -1, utf16, _countof(utf16));
 		if (cch >= 0)
 		{
-			ConvertToPunycode(utf16, punycode, sizeof punycode - 1);
+			ConvertToPunycode(utf16, punycode, 512 - 1);
 			myLower(punycode, false);
 			hostname = punycode;
 		}
 	}
-	return const_cast<char *>(strdup(hostname));
+	return hostname;
 }
 
 bool chkQu(const char *query)
@@ -2433,11 +2432,10 @@ void transcode(data5 *req, char encoding)
 			myLower(tempbuff);
 			break;
 		case 'u':
-			ConvertFromPunycode(tempbuff, extbuff, sizeof extbuff - 1);
+			ConvertFromPunycode(tempbuff, extbuff, _countof(extbuff) - 1);
 			buff = extbuff;
 			break;
 		}
-		//_strupr(tempbuff);
 		req->dp += pQu(req->dp, buff);
 		MYWORD qtype = fUShort(indp);
 		indp += 2;
@@ -2807,7 +2805,7 @@ bool frdnmess(data5 *req)
 	return false;
 }
 
-void add2Cache(MYBYTE ind, char *hostname, MYDWORD ip, time_t expiry, MYBYTE aType, MYBYTE pType)
+void add2Cache(MYBYTE ind, char *hostname, MYDWORD ip, time_t expiry, MYBYTE aType, MYBYTE pType, MYWORD codepage)
 {
 	char tempbuff[512];
 	//printf("Adding %s=%s \n", hostname, IP2String(ip));
@@ -2887,9 +2885,8 @@ void add2Cache(MYBYTE ind, char *hostname, MYDWORD ip, time_t expiry, MYBYTE aTy
 	if (aType)
 	{
 		data7 *cache = NULL;
-		strcpy(tempbuff, hostname);
+		AnsiToPunycode(hostname, codepage, tempbuff);
 		makeLocal(tempbuff);
-		myLower(tempbuff);
 
 		hostMap::iterator p = dnsCache[ind].find(tempbuff);
 		while (p != dnsCache[ind].end() &&
@@ -3202,9 +3199,9 @@ MYDWORD resad(data9 *req)
 
 	if (dnsService && req->hostname[0])
 	{
-		char hostname[128];
-		strcpy(hostname, req->hostname);
-		myLower(hostname);
+		char hostname[512];
+		MYWORD codepage = req->dhcpEntry ? req->dhcpEntry->codepage : cfig.codepage;
+		AnsiToPunycode(req->hostname, codepage, hostname);
 		hostMap::iterator it = dnsCache[currentInd].find(hostname);
 
 		for (; it != dnsCache[currentInd].end(); it++)
@@ -3216,7 +3213,7 @@ MYDWORD resad(data9 *req)
 			if (strcasecmp(cache->mapname, hostname))
 				break;
 
-			if (cache && cache->ip)
+			if (cache->ip)
 			{
 				char k = getRangeInd(cache->ip);
 
@@ -3687,13 +3684,13 @@ MYDWORD alad(data9 *req)
 
 void updateCachedHostname(data9 *req)
 {
-	if (!req->dhcpEntry->hostname || strcasecmp(req->dhcpEntry->hostname, req->hostname))
+	//if (!req->dhcpEntry->hostname || strcasecmp(req->dhcpEntry->hostname, req->hostname))
 	{
 		free(req->dhcpEntry->hostname);
 		MYWORD codepage = req->dhcpEntry->codepage;
 		if (codepage == 0)
 			codepage = cfig.codepage;
-		req->dhcpEntry->hostname = AnsiToPunycode(req->hostname, codepage);
+		req->dhcpEntry->hostname = strdup(AnsiToPunycode(req->hostname, codepage));
 	}
 }
 
@@ -3906,11 +3903,17 @@ void updateDNS(data9 *req)
 
 	if (req->dhcpEntry && cfig.replication != 2)
 	{
+		MYWORD codepage = cfig.codepage;
+
+		if (data7 *dhcpEntry = req->dhcpEntry)
+			if (MYWORD clientcp = dhcpEntry->codepage)
+				codepage = clientcp;
+
 		//printf("Update DNS t=%d exp=%d\n", t, req->dhcpEntry->expiry);
 		if (isLocal(req->dhcpEntry->ip))
-			add2Cache(currentInd, req->hostname, req->dhcpEntry->ip, expiry, LOCAL_A, LOCAL_PTR_AUTH);
+			add2Cache(currentInd, req->hostname, req->dhcpEntry->ip, expiry, LOCAL_A, LOCAL_PTR_AUTH, codepage);
 		else
-			add2Cache(currentInd, req->hostname, req->dhcpEntry->ip, expiry, LOCAL_A, LOCAL_PTR_NAUTH);
+			add2Cache(currentInd, req->hostname, req->dhcpEntry->ip, expiry, LOCAL_A, LOCAL_PTR_NAUTH, codepage);
 	}
 }
 
@@ -6180,7 +6183,7 @@ data7 *findDHCPEntry(char *key)
 
 void addEntry(MYBYTE ind, data7 *entry)
 {
-	myLower(entry->mapname);
+	// myLower(entry->mapname, false);
 	dnsCache[ind].insert(pair<string, data7*>(entry->mapname, entry));
 
 	if (entry->expiry && entry->expiry < INT_MAX)
@@ -9272,7 +9275,7 @@ data7 *createCache(const data71 *lump)
 			}
 
 			if (lump->hostname && lump->hostname[0])
-				cache->hostname = strdup(lump->hostname);
+				cache->hostname = strdup(AnsiToPunycode(lump->hostname, cfig.codepage));
 
 			return cache;
 		}
