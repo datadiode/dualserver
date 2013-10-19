@@ -92,6 +92,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\HttpHandler.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\punycode\punycode.cpp"
 				>
 			</File>
@@ -111,6 +115,10 @@
 			</File>
 			<File
 				RelativePath=".\DualServer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\HttpHandler.h"
 				>
 			</File>
 			<File

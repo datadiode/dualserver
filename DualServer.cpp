@@ -31,6 +31,7 @@
 #include "PunyConvert.h"
 #include "LeakDetector.h"
 #include "DualServer.h"
+#include "HttpHandler.h"
 
 //Global Variables
 volatile bool kRunning = true;
@@ -52,7 +53,6 @@ expiryMap dnsAge[2];
 //expiryMap dhcpAge;
 char serviceName[] = "DUALServer";
 const char displayName[] = "Dual DHCP DNS Service";
-char htmlTitle[256] = "";
 char filePATH[_MAX_PATH];
 char iniFile[_MAX_PATH];
 char leaFile[_MAX_PATH];
@@ -71,37 +71,6 @@ HANDLE lEvent;
 const char NBSP = 32;
 const char RANGESET[] = "RANGE_SET";
 const char GLOBALOPTIONS[] = "GLOBAL_OPTIONS";
-const char td200[] = "<td>%s</td>";
-const char sVersion[] = "Dual DHCP DNS Server Version 7.11p Windows Build 0001";
-const char htmlStart[] =
-	"<!DOCTYPE HTML 4.0 Transitional>\n"
-	"<html>\n"
-	"<head>\n"
-	"<title>%s</title>\n"
-	"<meta http-equiv='refresh' content='60'>\n"
-	"<meta http-equiv='cache-control' content='no-cache'>\n"
-	"<meta http-equiv='Content-Type' content='text/html; charset=UTF-8'>\n"
-	"<style>\n"
-	"body { background-color: #cccccc; }\n"
-	"table { table-layout: fixed; width: 480pt; margin-top: 2ex; }\n"
-	"caption { font: bold 14pt sans-serif; }\n"
-	"tHead td { font: 10pt sans-serif; }\n"
-	"tHead th { font: bold italic 14pt sans-serif; background-color: #b8b8b8; }\n"
-	"tBody th { font: bold 10pt sans-serif; background-color: #b8b8b8; }\n"
-	"tBody td { font: 10pt monospace; word-wrap: break-word; background-color: #b8b8b8; }\n" // white-space: nowrap;
-	"</style>\n"
-	"</head>\n";
-const char bodyStart[] =
-	"<body>\n"
-	"<table>\n"
-	"<caption>%s</caption>\n"
-	"<tHead>\n"
-	"<tr>\n"
-	"<td width='40%%' align='left'><a target='_new' href='http://dhcp-dns-server.sourceforge.net'>http://dhcp-dns-server.sourceforge.net</a></td>\n"
-	"<td width='60%%' align='right'>punycode-enabled fork: <a target='_new' href='https://bitbucket.org/jtuc/dualserver'>https://bitbucket.org/jtuc/dualserver</a></td>\n"
-	"</tr>\n"
-	"</tHead>\n"
-	"</table>\n";
 
 const data4 opData[] =
 {
@@ -523,21 +492,7 @@ void __cdecl serverloop(void *)
 			{
 				if (network.httpConn.ready && FD_ISSET(network.httpConn.sock, &readfds))
 				{
-					if (data19 *req = new data19)
-					{
-						req->sockLen = sizeof req->remote;
-						req->sock = accept(network.httpConn.sock, (sockaddr*)&req->remote, &req->sockLen);
-						if (req->sock == INVALID_SOCKET)
-						{
-							int error = WSAGetLastError();
-							sprintf(logBuff, "Accept Failed, WSAError %u", error);
-							logDHCPMess(logBuff, 1);
-							delete req;
-						}
-						else
-							procHTTP(req);
-					}
-					else
+					if (new HttpHandler(network.httpConn.sock) == NULL)
 					{
 						sprintf(logBuff, "Memory Error");
 						logDHCPMess(logBuff, 1);
@@ -1531,394 +1486,6 @@ void addRRMXOne(data5 *req, MYBYTE m)
 	req->dp += pUShort(req->dp, cfig.mxServers[currentInd][m].pref);
 	req->dp += pQu(req->dp, cfig.mxServers[currentInd][m].hostname);
 	//req->bytes = req->dp - req->raw;
-}
-
-void procHTTP(data19 *req)
-{
-	char logBuff[1024];
-	//debug("procHTTP");
-
-	req->ling.l_onoff = 1; //0 = off (l_linger ignored), nonzero = on
-	req->ling.l_linger = 30; //0 = discard data, nonzero = wait for data sent
-	setsockopt(req->sock, SOL_SOCKET, SO_LINGER, (const char*)&req->ling, sizeof(req->ling));
-
-	timeval tv1;
-	tv1.tv_sec = 1;
-	tv1.tv_usec = 0;
-
-	fd_set readfds1;
-	FD_ZERO(&readfds1);
-	FD_SET(req->sock, &readfds1);
-
-	char buffer[1024];
-
-	int bytes = -1;
-	if (select((req->sock + 1), &readfds1, NULL, NULL, &tv1))
-		bytes = recv(req->sock, buffer, sizeof buffer - 1, 0);
-
-	if (bytes <= 0)
-	{
-		int error = WSAGetLastError();
-		sprintf(logBuff, "Client %s, HTTP Message Receive failed, WSAError %d", IP2String(req->remote.sin_addr.s_addr), error);
-		logDHCPMess(logBuff, 1);
-		closesocket(req->sock);
-		free(req);
-		return;
-	}
-
-	sprintf(logBuff, "Client %s, HTTP Request Received", IP2String(req->remote.sin_addr.s_addr));
-	logDHCPMess(logBuff, 2);
-
-	if (cfig.httpClients[0] && !findServer(cfig.httpClients, 8, req->remote.sin_addr.s_addr))
-	{
-		req->code = 403;
-		sprintf(logBuff, "Client %s, HTTP Access Denied", IP2String(req->remote.sin_addr.s_addr));
-		logDHCPMess(logBuff, 2);
-	}
-	else try
-	{
-		char *fp = buffer + bytes;
-		*fp = '\0';
-		if (char *end = strchr(buffer, '\n'))
-		{
-			*end = '\0';
-			if (char *slash = strchr(buffer, '/'))
-				fp = slash;
-			fp[strcspn(fp, "\t ")] = '\0';
-		}
-		if (!strcasecmp(fp, "/"))
-			sendStatus(req);
-		/*else if (!strcasecmp(fp, "/scopestatus"))
-			sendScopeStatus(req);*/
-		else
-		{
-			req->code = 404;
-			if (*fp != '\0')
-			{
-				sprintf(logBuff, "Client %s, %.100s not found", IP2String(req->remote.sin_addr.s_addr), fp);
-				logDHCPMess(logBuff, 2);
-			}
-			else
-			{
-				sprintf(logBuff, "Client %s, Invalid http request", IP2String(req->remote.sin_addr.s_addr));
-				logDHCPMess(logBuff, 2);
-			}
-		}
-	}
-	catch (std::bad_alloc)
-	{
-		req->code = 507;
-		sprintf(logBuff, "Memory Error");
-		logDHCPMess(logBuff, 1);
-	}
-	BeginThread(sendHTTP, 0, req);
-}
-
-void sendStatus(data19 *req)
-{
-	char tempbuff[512];
-	//debug("sendStatus");
-
-	dhcpMap::iterator p;
-
-	sprintf_string fp;
-
-	fp += sprintf(fp, htmlStart, htmlTitle);
-	fp += sprintf(fp, bodyStart, sVersion);
-	fp += sprintf(fp, "<table border='1' cellpadding='1'>\n");
-
-	if (cfig.dhcpRepl > t)
-	{
-		fp += sprintf(fp,
-			"<tHead><tr><th colspan='5'>Active Leases</th></tr></tHead>\n"
-			"<tr>"
-			"<th>Mac Address</th>"
-			"<th>IP</th>"
-			"<th>Lease Expiry</th>"
-			"<th>Hostname</th>"
-			"<th>Server</th>"
-			"</tr>\n");
-	}
-	else
-	{
-		fp += sprintf(fp,
-			"<tHead><tr><th colspan='4'>Active Leases</th></tr></tHead>\n"
-			"<tr>"
-			"<th>Mac Address</th>"
-			"<th>IP</th>"
-			"<th>Lease Expiry</th>"
-			"<th>Hostname</th>"
-			"</tr>\n");
-	}
-
-	for (p = dhcpCache.begin(); kRunning && p != dhcpCache.end(); ++p)
-	{
-		data7 *dhcpEntry = p->second;
-		if (dhcpEntry->display && dhcpEntry->expiry >= t)
-		{
-			fp += sprintf(fp, "<tr>");
-			fp += sprintf(fp, td200, dhcpEntry->mapname);
-			fp += sprintf(fp, td200, IP2String(dhcpEntry->ip));
-
-			if (dhcpEntry->expiry >= INT_MAX)
-				fp += sprintf(fp, td200, "Infinity");
-			else
-			{
-				tm *ttm = localtime(&dhcpEntry->expiry);
-				strftime(tempbuff, sizeof tempbuff, "%d-%b-%y %X", ttm);
-				fp += sprintf(fp, td200, tempbuff);
-			}
-
-			if (dhcpEntry->hostname)
-			{
-				ConvertFromPunycode(dhcpEntry->hostname, tempbuff, _countof(tempbuff) - 1);
-				fp += sprintf(fp, td200, tempbuff);
-			}
-			else
-				fp += sprintf(fp, td200, "&nbsp;");
-
-			if (cfig.dhcpRepl > t)
-			{
-				if (dhcpEntry->local && cfig.replication == 1)
-					fp += sprintf(fp, td200, "Primary");
-				else if (dhcpEntry->local && cfig.replication == 2)
-					fp += sprintf(fp, td200, "Secondary");
-				else if (cfig.replication == 1)
-					fp += sprintf(fp, td200, "Secondary");
-				else
-					fp += sprintf(fp, td200, "Primary");
-			}
-
-			fp += sprintf(fp, "</tr>\n");
-		}
-	}
-
-/*
-	fp += sprintf(fp, "</table>\n<table border='1' cellpadding='1'>\n");
-	fp += sprintf(fp, "<tHead><tr><th colspan='5'>Free Dynamic Leases</th></tr></tHead>\n");
-	MYBYTE colNum = 0;
-
-	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount; rangeInd++)
-	{
-		for (MYDWORD ind = 0, iip = cfig.dhcpRanges[rangeInd].rangeStart; kRunning && iip <= cfig.dhcpRanges[rangeInd].rangeEnd; iip++, ind++)
-		{
-			if (cfig.dhcpRanges[rangeInd].expiry[ind] < t)
-			{
-				if (!colNum)
-				{
-					fp += sprintf(fp, "<tr>");
-					colNum = 1;
-				}
-				else if (colNum < 5)
-					++colNum;
-				else
-				{
-					fp += sprintf(fp, "</tr>\n<tr>");
-					colNum = 1;
-				}
-
-				fp += sprintf(fp, td200, IP2String(htonl(iip)));
-			}
-		}
-	}
-
-	if (colNum)
-		fp += sprintf(fp, "</tr>\n");
-*/
-	fp += sprintf(fp,
-		"</table>\n"
-		"<table border='1' cellpadding='1'>\n"
-		"<tHead><tr><th colspan='4'>Free Dynamic Leases</th></tr></tHead>\n"
-		"<tr>"
-		"<th align='left' colspan='2'>DHCP Range</th>"
-		"<th align='right'>Available Leases</th>"
-		"<th align='right'>Free Leases</th>"
-		"</tr>\n");
-
-	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount; ++rangeInd)
-	{
-		int ipused = 0;
-		int ipfree = 0;
-		int ind = 0;
-
-		for (MYDWORD iip = cfig.dhcpRanges[rangeInd].rangeStart; iip <= cfig.dhcpRanges[rangeInd].rangeEnd; iip++, ind++)
-		{
-			if (cfig.dhcpRanges[rangeInd].expiry[ind] < t)
-				++ipfree;
-			else if (cfig.dhcpRanges[rangeInd].dhcpEntry[ind] && !(cfig.dhcpRanges[rangeInd].dhcpEntry[ind]->fixed))
-				++ipused;
-		}
-		fp += sprintf(fp, "<tr><td colspan='2'>%s - %s</td><td align='right'>%d</td><td align='right'>%d</td></tr>\n",
-			IP2String(ntohl(cfig.dhcpRanges[rangeInd].rangeStart)),
-			IP2String(ntohl(cfig.dhcpRanges[rangeInd].rangeEnd)),
-			ipused + ipfree,
-			ipfree);
-	}
-
-	fp += sprintf(fp,
-		"</table>\n"
-		"<table border='1' cellpadding='1'>\n"
-		"<tHead><tr><th colspan='4'>Free Static Leases</th></tr></tHead>\n"
-		"<tr><th>Mac Address</th><th>IP</th><th>Mac Address</th><th>IP</th></tr>\n");
-
-	MYBYTE colNum = 0;
-
-	for (p = dhcpCache.begin(); kRunning && p != dhcpCache.end(); ++p)
-	{
-		data7 *dhcpEntry = p->second;
-		if (dhcpEntry->fixed && dhcpEntry->expiry < t)
-		{
-			if (!colNum)
-			{
-				fp += sprintf(fp, "<tr>");
-				colNum = 1;
-			}
-			else if (colNum == 1)
-			{
-				colNum = 2;
-			}
-			else if (colNum == 2)
-			{
-				fp += sprintf(fp, "</tr>\n<tr>");
-				colNum = 1;
-			}
-
-			fp += sprintf(fp, td200, dhcpEntry->mapname);
-			fp += sprintf(fp, td200, IP2String(dhcpEntry->ip));
-		}
-	}
-
-	if (colNum)
-		fp += sprintf(fp, "</tr>\n");
-
-	fp += sprintf(fp, "</table>\n</body>\n</html>");
-
-	fp.swap(req->data);
-	req->code = 200;
-}
-
-/*
-void sendScopeStatus(data19 *req)
-{
-	//debug("sendScopeStatus");
-
-	sprintf_string fp;
-
-	fp += sprintf(fp, htmlStart, htmlTitle);
-	fp += sprintf(fp, bodyStart, sVersion);
-	fp += sprintf(fp, "<table border='1' cellpadding='1'>\n");
-	fp += sprintf(fp, "<tr><th colspan='4'><i>Scope Status</i></th></tr>\n");
-	fp += sprintf(fp, "<tr><td><b>DHCP Range</b></td><td align=\"right\"><b>IPs Used</b></td><td align=\"right\"><b>IPs Free</b></td><td align=\"right\"><b>%% Free</b></td></tr>\n");
-
-	for (char rangeInd = 0; kRunning && rangeInd < cfig.rangeCount; ++rangeInd)
-	{
-		float ipused = 0;
-		float ipfree = 0;
-		int ind = 0;
-
-		for (MYDWORD iip = cfig.dhcpRanges[rangeInd].rangeStart; iip <= cfig.dhcpRanges[rangeInd].rangeEnd; iip++, ind++)
-		{
-			if (cfig.dhcpRanges[rangeInd].expiry[ind] > t)
-				++ipused;
-			else
-				++ipfree;
-		}
-
-		;
-		;
-		fp += sprintf(fp, "<tr><td>%s - %s</td><td align=\"right\">%5.0f</td><td align=\"right\">%5.0f</td><td align=\"right\">%2.2f</td></tr>\n",
-			IP2String(ntohl(cfig.dhcpRanges[rangeInd].rangeStart)),
-			IP2String(ntohl(cfig.dhcpRanges[rangeInd].rangeEnd)),
-			ipused, ipfree, ((ipfree * 100)/(ipused + ipfree)));
-	}
-
-	fp += sprintf(fp, "</table>\n</body>\n</html>");
-
-	fp.swap(req->data);
-	req->code = 200;
-}
-*/
-
-void __cdecl sendHTTP(void *param)
-{
-	data19 *req = static_cast<data19 *>(param);
-
-	static const char send200[] =
-		"HTTP/1.1 200 OK\r\n"
-		"Date: %a, %d %b %Y %H:%M:%S GMT\r\n"
-		"Last-Modified: %a, %d %b %Y %H:%M:%S GMT\r\n"
-		"Content-Type: text/html\r\n"
-		"Connection: Close\r\n";
-
-	static const char send403[] =
-		"HTTP/1.1 403 Forbidden\r\n\r\n<h1>403 Forbidden</h1>";
-
-	static const char send404[] =
-		"HTTP/1.1 404 Not Found\r\n\r\n<h1>404 Not Found</h1>";
-
-	static const char send507[] =
-		"HTTP/1.1 507 Not Found\r\n\r\n<h1>507 Insufficient Storage</h1>";
-
-	char header[512];
-	char *dp = header;
-
-	switch (req->code)
-	{
-	case 200:
-		dp += strftime(dp, _countof(header), send200, gmtime(&t));
-		dp += sprintf(dp, "Content-Length: %d\r\n\r\n", req->data.length());
-		break;
-	case 403:
-		dp += sprintf(dp, send403);
-		break;
-	case 404:
-		dp += sprintf(dp, send404);
-		break;
-	case 507:
-		dp += sprintf(dp, send507);
-		break;
-	}
-
-	struct
-	{
-		int bytes;
-		const char *dp;
-	} chunks[] =
-	{
-		{ dp - header, header },
-		{ req->data.length(), req->data.c_str() }
-	}, *pchunk = chunks;
-
-	do
-	{
-		timeval tv1;
-		tv1.tv_sec = 1;
-		tv1.tv_usec = 0;
-
-		fd_set writefds1;
-		FD_ZERO(&writefds1);
-		FD_SET(req->sock, &writefds1);
-
-		if (!select((req->sock + 1), NULL, &writefds1, NULL, &tv1))
-			break;
-
-		int bytes = pchunk->bytes;
-		if (bytes > 1024)
-			bytes = 1024;
-
-		bytes = send(req->sock, pchunk->dp, bytes, 0);
-		if (bytes < 0)
-			break;
-
-		pchunk->dp += bytes;
-		pchunk->bytes -= bytes;
-
-	} while (kRunning &&
-		(pchunk->bytes > 0 || ++pchunk < chunks + _countof(chunks)));
-
-	closesocket(req->sock);
-	delete req;
-	EndThread();
 }
 
 void procTCP(data5 *req)
@@ -8725,8 +8292,7 @@ int runProg()
 					}
 					else if (!strcasecmp(name, "HTTPTitle"))
 					{
-						strncpy(htmlTitle, value, _countof(htmlTitle) - 1);
-						htmlTitle[_countof(htmlTitle) - 1] = 0;
+						HttpHandler::htmlTitle = value;
 					}
 					else
 					{
@@ -8737,8 +8303,11 @@ int runProg()
 				rewind(ff);
 			}
 
-			if (htmlTitle[0] == 0)
-				sprintf(htmlTitle, "Dual Server on %s", cfig.servername);
+			if (HttpHandler::htmlTitle.empty())
+			{
+				ConvertFromPunycode(cfig.servername, value, _countof(value) - 1);
+				HttpHandler::htmlTitle.append_sprintf("Dual Server on %s", value);
+			}
 
 			network.httpConn.sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 

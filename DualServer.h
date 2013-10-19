@@ -20,6 +20,8 @@
 //This file defines all structures and constants
 //for both DHCP and DNS Servers
 
+const char sVersion[] = "Dual DHCP DNS Server Version 7.11p Windows Build 0001";
+
 #define MYBYTE unsigned char
 #define MYWORD unsigned short
 #define MYDWORD unsigned int
@@ -33,11 +35,12 @@
 
 #include "EASTL/string.h"
 #include "EASTL/map.h"
+#include "EASTL/list.h"
 
 using namespace eastl;
 
-#define sprintf_string \
-	typedef string sprintf; struct : string, string::CtorSprintf { }
+uintptr_t BeginThread(void (__cdecl *entrypoint)(void *), unsigned stacksize, void *param);
+void EndThread();
 
 #define MAX_SERVERS 125
 #define MAX_DHCP_RANGES 125
@@ -642,24 +645,6 @@ struct data17
 	bool subnetFound;
 };
 
-struct data19
-{
-	SOCKET sock;
-	SOCKADDR_IN remote;
-	socklen_t sockLen;
-	linger ling;
-	string data;
-	int code;
-	void *operator new(size_t size)
-	{
-		return calloc(1, size);
-	}
-	void operator delete(void *p)
-	{
-		free(p);
-	}
-};
-
 struct data20
 {
 	MYBYTE options[sizeof(dhcp_packet)];
@@ -846,6 +831,12 @@ public:
 	type data[size];
 };
 
+//Global Variables
+extern time_t t;
+extern dhcpMap dhcpCache;
+extern volatile bool kRunning;
+extern struct data2 cfig;
+
 //Function Prototypes
 bool chkQu(const char*);
 bool checkMask(MYDWORD);
@@ -934,10 +925,8 @@ void logDNSMess(const char*, MYBYTE);
 void logDNSMess(data5*, const char*, MYBYTE);
 void logTCPMess(data5*, const char*, MYBYTE);
 bool mySplit(char*, char*, const char*, char);
-void sendChunk(data19*);
 void sendToken();
 void procTCP(data5*);
-void procHTTP(data19*);
 void pvdata(data9*, data3*);
 void recvRepl(data9*);
 void debug(const char*);
@@ -949,9 +938,6 @@ void holdIP(MYDWORD);
 void setTempLease(data7*);
 void setLeaseExpiry(data7*);
 void setLeaseExpiry(data7*, MYDWORD);
-void sendScopeStatus(data19 *req);
-void sendStatus(data19 *req);
-void sendHTTP(void*);
 void updateDNS(data9*);
 void updateStateFile(data7*);
 int fdnmess(data5*);
