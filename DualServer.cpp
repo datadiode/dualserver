@@ -43,7 +43,6 @@ const HANDLE stopServiceEvent = CreateEvent(NULL, TRUE, FALSE, 0);
 data1 network;
 data2 cfig;
 data9 token;
-data9 dhcpr;
 data5 dnsr;
 MYBYTE currentInd = 0;
 MYBYTE newInd = 0;
@@ -501,12 +500,14 @@ void __cdecl serverloop(void *)
 
 				if (cfig.dhcpReplConn.ready && FD_ISSET(cfig.dhcpReplConn.sock, &readfds))
 				{
+					data9 dhcpr;
 					if (dhcpr.recvfrom(cfig.dhcpReplConn.sock) <= 0)
 						cfig.dhcpRepl = 0;
 				}
 
 				for (MYBYTE i = 0; i < MAX_SERVERS && network.dhcpConn[i].ready; i++)
 				{
+					data9 dhcpr;
 					if (FD_ISSET(network.dhcpConn[i].sock, &readfds) && gdmess(&dhcpr, i) && sdmess(&dhcpr))
 						alad(&dhcpr);
 				}
