@@ -18,43 +18,9 @@
 *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
 ***************************************************************************/
 
-class HttpChunkList
-	: public list<char *>
-	, public string::CtorSprintf
-{
-public:
-	const string::size_type chunk;
-	string::size_type avail;
-	HttpChunkList(const string::size_type chunk = 1024): chunk(chunk), avail(0)
-	{
-	}
-	~HttpChunkList()
-	{
-		for (iterator p = begin(); p != end(); ++p)
-			delete []*p;
-	}
-	string::size_type total()
-	{
-		return size() * chunk - avail;
-	}
-	void operator += (const string &s)
-	{
-		string::size_type ahead = s.length();
-		while (ahead != 0)
-		{
-			if (avail == 0)
-				push_back(new char[avail = chunk]);
-			string::size_type bytes = ahead < avail ? ahead : avail;
-			memcpy(back() + chunk - avail, s.c_str() + s.size() - ahead, bytes);
-			ahead -= bytes;
-			avail -= bytes;
-		}
-	}
-private:
-	void operator=(const HttpChunkList &);
-};
+#include "HttpResponse.h"
 
-class HttpHandler
+class HttpHandler: public HttpResponse::ISend
 {
 public:
 	HttpHandler(SOCKET selected);
@@ -68,11 +34,14 @@ public:
 		free(p);
 	}
 
-	static string htmlTitle;
+	static char htmlTitle[512];
 
 private:
+	static const HttpResponse::size_type buffer_size = 2048;
+
 	void sendStatus();
 	void sendScopeStatus();
+	virtual bool send(const char *, HttpResponse::size_type);
 	static void __cdecl sendThread(void *);
 	void operator=(const HttpHandler &);
 
@@ -80,6 +49,5 @@ private:
 	SOCKADDR_IN remote;
 	socklen_t sockLen;
 	linger ling;
-	HttpChunkList fp;
-	int code;
+	HttpResponse fp;
 };

@@ -96,6 +96,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\HttpResponse.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\punycode\punycode.cpp"
 				>
 			</File>
@@ -119,6 +123,10 @@
 			</File>
 			<File
 				RelativePath=".\HttpHandler.h"
+				>
+			</File>
+			<File
+				RelativePath=".\HttpResponse.h"
 				>
 			</File>
 			<File

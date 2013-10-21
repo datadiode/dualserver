@@ -35,7 +35,6 @@ const char sVersion[] = "Dual DHCP DNS Server Version 7.11p Windows Build 0001";
 
 #include "EASTL/string.h"
 #include "EASTL/map.h"
-#include "EASTL/list.h"
 
 using namespace eastl;
 
@@ -445,16 +444,8 @@ struct ConnType
 #define DHCP_OPTION_NEXTSERVER				254
 #define DHCP_OPTION_END						255
 
-//#define DHCP_VENDORDATA_SIZE		272
-//#define DHCP_VENDORDATA_SIZE		64
-//#define DHCP_VENDORDATA_SIZE		784
-//#define DHCP_PACKET_SIZE			1024
-//#define DHCP_MIN_SIZE				44
-//#define DHCP_MAX_CLIENTS			254
 #define IPPORT_DHCPS	67
 #define IPPORT_DHCPC	68
-#define VM_STANFORD		0x5354414EUL
-#define VM_RFC1048		0x63825363UL
 
 struct data3
 {

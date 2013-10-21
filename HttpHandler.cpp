@@ -18,7 +18,7 @@
 *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
 ***************************************************************************/
 // HttpHandler.cpp
-// Last change: 2013-10-12 by Jochen Neubeck
+// Last change: 2013-10-20 by Jochen Neubeck
 #include <stdio.h>
 #include <winsock2.h>
 #include <time.h>
@@ -32,7 +32,27 @@
 #include "DualServer.h"
 #include "HttpHandler.h"
 
+static const char send200[] =
+	"HTTP/1.1 200 OK\r\n"
+	"Date: %a, %d %b %Y %H:%M:%S GMT\r\n"
+	"Last-Modified: %a, %d %b %Y %H:%M:%S GMT\r\n"
+	"Content-Type: text/html\r\n"
+	"Connection: Close\r\n";
+
+static const char httpContentLength[] =
+	"Content-Length: %d\r\n\r\n";
+
+static const char send403[] =
+	"HTTP/1.1 403 Forbidden\r\n\r\n<h1>403 Forbidden</h1>";
+
+static const char send404[] =
+	"HTTP/1.1 404 Not Found\r\n\r\n<h1>404 Not Found</h1>";
+
+static const char send507[] =
+	"HTTP/1.1 507 Insufficient Storage\r\n\r\n<h1>507 Insufficient Storage</h1>";
+
 static const char td200[] = "<td>%s</td>";
+
 static const char htmlStart[] =
 	"<!DOCTYPE HTML 4.0 Transitional>\n"
 	"<html>\n"
@@ -51,6 +71,7 @@ static const char htmlStart[] =
 	"tBody td { font: 10pt monospace; word-wrap: break-word; }\n" // white-space: nowrap;
 	"</style>\n"
 	"</head>\n";
+
 static const char bodyStart[] =
 	"<body>\n"
 	"<table cellspacing='0'>\n"
@@ -61,7 +82,7 @@ static const char bodyStart[] =
 	"</tr>\n"
 	"</table>\n";
 
-string HttpHandler::htmlTitle;
+char HttpHandler::htmlTitle[512];
 
 HttpHandler::HttpHandler(SOCKET selected)
 {
@@ -76,7 +97,6 @@ HttpHandler::HttpHandler(SOCKET selected)
 		delete this;
 		return;
 	}
-	//debug("procHTTP");
 
 	ling.l_onoff = 1; //0 = off (l_linger ignored), nonzero = on
 	ling.l_linger = 30; //0 = discard data, nonzero = wait for data sent
@@ -111,31 +131,31 @@ HttpHandler::HttpHandler(SOCKET selected)
 
 	if (cfig.httpClients[0] && !findServer(cfig.httpClients, 8, remote.sin_addr.s_addr))
 	{
-		code = 403;
+		fp.cancel(send403);
 		sprintf(logBuff, "Client %s, HTTP Access Denied", IP2String(remote.sin_addr.s_addr));
 		logDHCPMess(logBuff, 2);
 	}
 	else try
 	{
-		char *fp = buffer + bytes;
-		*fp = '\0';
+		char *url = buffer + bytes;
+		*url = '\0';
 		if (char *end = strchr(buffer, '\n'))
 		{
 			*end = '\0';
 			if (char *slash = strchr(buffer, '/'))
-				fp = slash;
-			fp[strcspn(fp, "\t ")] = '\0';
+				url = slash;
+			url[strcspn(url, "\t ")] = '\0';
 		}
-		if (!strcasecmp(fp, "/"))
+		if (!strcasecmp(url, "/"))
 			sendStatus();
-		else if (!strcasecmp(fp, "/scopestatus"))
+		else if (!strcasecmp(url, "/scopestatus"))
 			sendScopeStatus();
 		else
 		{
-			code = 404;
-			if (*fp != '\0')
+			fp.cancel(send404);
+			if (*url != '\0')
 			{
-				sprintf(logBuff, "Client %s, %.100s not found", IP2String(remote.sin_addr.s_addr), fp);
+				sprintf(logBuff, "Client %s, %.100s not found", IP2String(remote.sin_addr.s_addr), url);
 				logDHCPMess(logBuff, 2);
 			}
 			else
@@ -147,7 +167,7 @@ HttpHandler::HttpHandler(SOCKET selected)
 	}
 	catch (std::bad_alloc)
 	{
-		code = 507;
+		fp.cancel(send507);
 		sprintf(logBuff, "Memory Error");
 		logDHCPMess(logBuff, 1);
 	}
@@ -157,11 +177,9 @@ HttpHandler::HttpHandler(SOCKET selected)
 void HttpHandler::sendStatus()
 {
 	char tempbuff[512];
-	//debug("sendStatus");
-
 	dhcpMap::iterator p;
 
-	typedef string sprintf;
+	char *dp = fp.open(buffer_size);
 
 	fp += sprintf(fp, htmlStart, htmlTitle);
 	fp += sprintf(fp, bodyStart, sVersion);
@@ -314,23 +332,24 @@ void HttpHandler::sendStatus()
 
 	fp += sprintf(fp, "</table>\n</body>\n</html>");
 
-	code = 200;
+	dp += strftime(dp, buffer_size, send200, gmtime(&t));
+	dp += sprintf(dp, httpContentLength, fp.total());
+
+	fp.close(dp);
 }
 
 void HttpHandler::sendScopeStatus()
 {
-	//debug("sendScopeStatus");
-
-	typedef string sprintf;
+	char *dp = fp.open(buffer_size);
 
 	fp += sprintf(fp, htmlStart, htmlTitle);
 	fp += sprintf(fp, bodyStart, sVersion);
 	fp += sprintf(fp,
 		"<table border='1' cellpadding='1'>\n"
 		"<tHead>\n"
-		"<tr><th colspan='5'>Scope Status</th></tr>\n"
+		"<tr><th colspan='6'>Scope Status</th></tr>\n"
 		"<tr>"
-		"<td colspan='2'>DHCP Range</td>"
+		"<td colspan='3'>DHCP Range</td>"
 		"<td align='right'>IPs Used</td>"
 		"<td align='right'>IPs Free</td>"
 		"<td align='right'>%% Free</td>"
@@ -353,7 +372,7 @@ void HttpHandler::sendScopeStatus()
 
 		fp += sprintf(fp,
 			"<tr>"
-			"<td colspan='2'>%s - %s</td>"
+			"<td colspan='3'>%s - %s</td>"
 			"<td align='right'>%d</td>"
 			"<td align='right'>%d</td>"
 			"<td align='right'>%.2f</td>"
@@ -365,79 +384,34 @@ void HttpHandler::sendScopeStatus()
 
 	fp += sprintf(fp, "</table>\n</body>\n</html>");
 
-	code = 200;
+	dp += strftime(dp, buffer_size, send200, gmtime(&t));
+	dp += sprintf(dp, httpContentLength, fp.total());
+
+	fp.close(dp);
+}
+
+bool HttpHandler::send(const char *dp, HttpResponse::size_type bytes)
+{
+	timeval tv;
+	tv.tv_sec = 1;
+	tv.tv_usec = 0;
+
+	fd_set writefds;
+	FD_ZERO(&writefds);
+	FD_SET(sock, &writefds);
+
+	if (::select(sock + 1, NULL, &writefds, NULL, &tv) <= 0)
+		return false;
+	if (::send(sock, dp, bytes, 0) <= 0)
+		return false;
+
+	return true;
 }
 
 void HttpHandler::sendThread(void *param)
 {
 	HttpHandler *req = static_cast<HttpHandler *>(param);
-
-	static const char send200[] =
-		"HTTP/1.1 200 OK\r\n"
-		"Date: %a, %d %b %Y %H:%M:%S GMT\r\n"
-		"Last-Modified: %a, %d %b %Y %H:%M:%S GMT\r\n"
-		"Content-Type: text/html\r\n"
-		"Connection: Close\r\n";
-
-	static const char send403[] =
-		"HTTP/1.1 403 Forbidden\r\n\r\n<h1>403 Forbidden</h1>";
-
-	static const char send404[] =
-		"HTTP/1.1 404 Not Found\r\n\r\n<h1>404 Not Found</h1>";
-
-	static const char send507[] =
-		"HTTP/1.1 507 Not Found\r\n\r\n<h1>507 Insufficient Storage</h1>";
-
-	char header[512];
-	char *dp = header;
-
-	switch (req->code)
-	{
-	case 200:
-		dp += strftime(dp, _countof(header), send200, gmtime(&t));
-		dp += sprintf(dp, "Content-Length: %d\r\n\r\n", req->fp.total());
-		break;
-	case 403:
-		dp += sprintf(dp, send403);
-		break;
-	case 404:
-		dp += sprintf(dp, send404);
-		break;
-	case 507:
-		dp += sprintf(dp, send507);
-		break;
-	}
-
-	int bytes = dp - header;
-	dp = header;
-
-	HttpChunkList::iterator p = req->fp.begin();
-	for (;;)
-	{
-		timeval tv1;
-		tv1.tv_sec = 1;
-		tv1.tv_usec = 0;
-
-		fd_set writefds1;
-		FD_ZERO(&writefds1);
-		FD_SET(req->sock, &writefds1);
-
-		if (!select((req->sock + 1), NULL, &writefds1, NULL, &tv1))
-			break;
-
-		bytes = send(req->sock, dp, bytes, 0);
-		if (bytes < 0)
-			break;
-
-		if (p == req->fp.end())
-			break;
-
-		bytes = req->fp.chunk;
-		dp = *p;
-		if (++p == req->fp.end())
-			bytes -= req->fp.avail;
-	}
-
+	req->fp.send(req);
 	closesocket(req->sock);
 	delete req;
 	EndThread();

@@ -18,7 +18,7 @@
 *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
 ***************************************************************************/
 // DualServer.cpp
-// Last change: 2013-10-12 by Jochen Neubeck
+// Last change: 2013-10-20 by Jochen Neubeck
 #include <stdio.h>
 #include <winsock2.h>
 #include <time.h>
@@ -3396,16 +3396,16 @@ MYDWORD resad(data9 *req)
 		if (rangeFound)
 		{
 			if (req->dhcpp.bp_giaddr)
-				sprintf(logBuff, "No free leases for DHCPDISCOVER for %s (%s) from RelayAgent %s", req->chaddr, req->hostname, IP2String(req->dhcpp.bp_giaddr));
+				sprintf(logBuff, "No free leases for DHCPDISCOVER for %s (%s) from RelayAgent %s", req->chaddr, hostname2utf8(req), IP2String(req->dhcpp.bp_giaddr));
 			else
-				sprintf(logBuff, "No free leases for DHCPDISCOVER for %s (%s) from interface %s", req->chaddr, req->hostname, IP2String(network.dhcpConn[req->sockInd].server));
+				sprintf(logBuff, "No free leases for DHCPDISCOVER for %s (%s) from interface %s", req->chaddr, hostname2utf8(req), IP2String(network.dhcpConn[req->sockInd].server));
 		}
 		else
 		{
 			if (req->dhcpp.bp_giaddr)
-				sprintf(logBuff, "No Matching DHCP Range for DHCPDISCOVER for %s (%s) from RelayAgent %s", req->chaddr, req->hostname, IP2String(req->dhcpp.bp_giaddr));
+				sprintf(logBuff, "No Matching DHCP Range for DHCPDISCOVER for %s (%s) from RelayAgent %s", req->chaddr, hostname2utf8(req), IP2String(req->dhcpp.bp_giaddr));
 			else
-				sprintf(logBuff, "No Matching DHCP Range for DHCPDISCOVER for %s (%s) from interface %s", req->chaddr, req->hostname, IP2String(network.dhcpConn[req->sockInd].server));
+				sprintf(logBuff, "No Matching DHCP Range for DHCPDISCOVER for %s (%s) from interface %s", req->chaddr, hostname2utf8(req), IP2String(network.dhcpConn[req->sockInd].server));
 		}
 		logDHCPMess(logBuff, 1);
 	}
@@ -8285,7 +8285,8 @@ int runProg()
 					}
 					else if (!strcasecmp(name, "HTTPTitle"))
 					{
-						HttpHandler::htmlTitle = value;
+						C_ASSERT(_countof(HttpHandler::htmlTitle) == _countof(value));
+						strcpy(HttpHandler::htmlTitle, value);
 					}
 					else
 					{
@@ -8296,10 +8297,10 @@ int runProg()
 				rewind(ff);
 			}
 
-			if (HttpHandler::htmlTitle.empty())
+			if (HttpHandler::htmlTitle[0] == '\0')
 			{
 				ConvertFromPunycode(cfig.servername, value, _countof(value) - 1);
-				HttpHandler::htmlTitle.append_sprintf("Dual Server on %s", value);
+				sprintf(HttpHandler::htmlTitle, "Dual Server on %s", value);
 			}
 
 			network.httpConn.sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
