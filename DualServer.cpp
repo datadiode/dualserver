@@ -8862,11 +8862,9 @@ bool gdmess(data9 *req, MYBYTE sockInd)
 {
 	char logBuff[1024];
 	//debug("gdmess");
-	memset(req, 0, sizeof(data9));
-	req->sockInd = sockInd;
-	req->sockLen = sizeof(req->remote);
 
-	req->recvfrom(network.dhcpConn[req->sockInd].sock);
+	req->recvfrom(network.dhcpConn[sockInd].sock);
+	req->sockInd = sockInd;
 
 	//printf("IP=%s bytes=%u\n", IP2String(tempbuff,req->remote.sin_addr.s_addr), req->bytes);
 
