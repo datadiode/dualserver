@@ -1,0 +1,1 @@
+This is a fork of Dual DHCP DNS Server as published at http://dhcp-dns-server.sourceforge.net. I created it for my personal research on DHCP / DNS mechanisms. As a bonus feature, it converts UTF-8 encoded names specified in its configuration file(s), as well as ones received through DNS updates sent by Windows 8++ clients, to Punycode (RFC 3492).
