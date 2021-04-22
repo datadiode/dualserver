@@ -78,7 +78,7 @@ static const char bodyStart[] =
 	"<caption>%s</caption>\n"
 	"<tr>\n"
 	"<th width='40%%' align='left'><a target='_new' href='http://dhcp-dns-server.sourceforge.net'>http://dhcp-dns-server.sourceforge.net</a></th>\n"
-	"<th width='60%%' align='right'>punycode-enabled fork: <a target='_new' href='https://bitbucket.org/jtuc/dualserver'>https://bitbucket.org/jtuc/dualserver</a></th>\n"
+	"<th width='60%%' align='right'>punycode-enabled fork: <a target='_new' href='https://github.com/datadiode/dualserver'>https://github.com/datadiode/dualserver</a></th>\n"
 	"</tr>\n"
 	"</table>\n";
 

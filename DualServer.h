@@ -20,7 +20,7 @@
 //This file defines all structures and constants
 //for both DHCP and DNS Servers
 
-const char sVersion[] = "Dual DHCP DNS Server Version 7.11p Windows Build 0001";
+extern const char sVersion[];
 
 #define MYBYTE unsigned char
 #define MYWORD unsigned short

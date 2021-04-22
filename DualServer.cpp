@@ -32,6 +32,9 @@
 #include "LeakDetector.h"
 #include "DualServer.h"
 #include "HttpHandler.h"
+#include "gen-versioninfo.h"
+
+const char sVersion[] = "Dual DHCP DNS Server Version " GEN_VER_VERSION_STRING;
 
 //Global Variables
 volatile bool kRunning = true;
