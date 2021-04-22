@@ -13,7 +13,7 @@ build:
   project: DualServer.sln
 
 after_build:
-- cmd: FOR /F %A IN (BuildTmp\DualServer\%PLATFORM%\%CONFIGURATION%\GIT-VS-VERSION-FILE) DO SET PRODUCT_VERSION=%A
+- cmd: FOR /F %%A IN (BuildTmp\DualServer\%PLATFORM%\%CONFIGURATION%\GIT-VS-VERSION-FILE) DO SET PRODUCT_VERSION=%%A
 
 artifacts:
 - path: Build\DualServer\$(platform)\$(configuration)
