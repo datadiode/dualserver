@@ -1,0 +1,97 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
+    </Filter>
+    <Filter Include="EASTL">
+      <UniqueIdentifier>{54389997-b27d-4599-ae9d-822761c2636f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CopyDeploy">
+      <UniqueIdentifier>{ddd0985f-7b96-4a9b-90a8-4cc2ea100179}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="convert_utf\ConvertUTF.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DualServer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="eastl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="HttpHandler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="HttpResponse.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="punycode\punycode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PunyConvert.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="EASTL\src\allocator.cpp">
+      <Filter>EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="EASTL\src\assert.cpp">
+      <Filter>EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="EASTL\src\fixed_pool.cpp">
+      <Filter>EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="EASTL\src\hashtable.cpp">
+      <Filter>EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="EASTL\src\red_black_tree.cpp">
+      <Filter>EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="EASTL\src\string.cpp">
+      <Filter>EASTL</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="convert_utf\ConvertUTF.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DualServer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="HttpHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="HttpResponse.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LeakDetector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="punycode\punycode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PunyConvert.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyDeployFiles Include="DualServer.ini.CopyDeploy">
+      <Filter>CopyDeploy</Filter>
+    </CopyDeployFiles>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyDeployFolders Include="log.CopyDeployFolder">
+      <Filter>CopyDeploy</Filter>
+    </CopyDeployFolders>
+  </ItemGroup>
+</Project>

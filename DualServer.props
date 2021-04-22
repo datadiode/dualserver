@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup
+    Condition="'$(CopyDeployFilesBeforeTargets)' == '' and '$(CopyDeployFilesAfterTargets)' == '' and '$(ConfigurationType)' != 'Makefile'">
+    <CopyDeployFilesBeforeTargets>Midl</CopyDeployFilesBeforeTargets>
+    <CopyDeployFilesAfterTargets>CustomBuild</CopyDeployFilesAfterTargets>
+  </PropertyGroup>
+  <PropertyGroup>
+    <CopyDeployFilesDependsOn
+      Condition="'$(ConfigurationType)' != 'Makefile'">_SelectedFiles;$(CopyDeployFilesDependsOn)</CopyDeployFilesDependsOn>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <CopyDeployFiles>
+      <CommandLineTemplate>copy /Y "%(FullPath)" "$(OutDir)%(Filename)"</CommandLineTemplate>
+      <Outputs>$(OutDir)%(Filename)</Outputs>
+    </CopyDeployFiles>
+  </ItemDefinitionGroup>
+  <PropertyGroup
+    Condition="'$(CopyDeployFoldersBeforeTargets)' == '' and '$(CopyDeployFoldersAfterTargets)' == '' and '$(ConfigurationType)' != 'Makefile'">
+    <CopyDeployFoldersBeforeTargets>Midl</CopyDeployFoldersBeforeTargets>
+    <CopyDeployFoldersAfterTargets>CustomBuild</CopyDeployFoldersAfterTargets>
+  </PropertyGroup>
+  <PropertyGroup>
+    <CopyDeployFoldersDependsOn
+      Condition="'$(ConfigurationType)' != 'Makefile'">_SelectedFiles;$(CopyDeployFoldersDependsOn)</CopyDeployFoldersDependsOn>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <CopyDeployFolders>
+      <CommandLineTemplate>xcopy /Y /I "%(FullPath)" "$(OutDir)%(Filename)"</CommandLineTemplate>
+      <Outputs>$(OutDir)%(Filename)\readme.txt</Outputs>
+    </CopyDeployFolders>
+  </ItemDefinitionGroup>
+</Project>

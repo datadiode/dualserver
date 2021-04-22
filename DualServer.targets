@@ -1,0 +1,137 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <PropertyPageSchema
+      Include="$(MSBuildThisFileDirectory)$(MSBuildThisFileName).xml" />
+    <AvailableItemName
+      Include="CopyDeployFiles">
+      <Targets>_CopyDeployFiles</Targets>
+    </AvailableItemName>
+    <AvailableItemName
+      Include="CopyDeployFolders">
+      <Targets>_CopyDeployFolders</Targets>
+    </AvailableItemName>
+  </ItemGroup>
+  <UsingTask
+    TaskName="CopyDeployFiles"
+    TaskFactory="XamlTaskFactory"
+    AssemblyName="Microsoft.Build.Tasks.v4.0">
+    <Task>$(MSBuildThisFileDirectory)$(MSBuildThisFileName).xml</Task>
+  </UsingTask>
+  <UsingTask
+    TaskName="CopyDeployFolders"
+    TaskFactory="XamlTaskFactory"
+    AssemblyName="Microsoft.Build.Tasks.v4.0">
+    <Task>$(MSBuildThisFileDirectory)$(MSBuildThisFileName).xml</Task>
+  </UsingTask>
+  <Target
+    Name="_CopyDeployFiles"
+    BeforeTargets="$(CopyDeployFilesBeforeTargets)"
+    AfterTargets="$(CopyDeployFilesAfterTargets)"
+    Condition="'@(CopyDeployFiles)' != ''"
+    DependsOnTargets="$(CopyDeployFilesDependsOn);ComputeCopyDeployFilesOutput"
+    Outputs="%(CopyDeployFiles.Outputs)"
+    Inputs="%(CopyDeployFiles.Identity);%(CopyDeployFiles.AdditionalDependencies);$(MSBuildProjectFile)">
+    <ItemGroup
+      Condition="'@(SelectedFiles)' != ''">
+      <CopyDeployFiles
+        Remove="@(CopyDeployFiles)"
+        Condition="'%(Identity)' != '@(SelectedFiles)'" />
+    </ItemGroup>
+    <ItemGroup>
+      <CopyDeployFiles_tlog
+        Include="%(CopyDeployFiles.Outputs)"
+        Condition="'%(CopyDeployFiles.Outputs)' != '' and '%(CopyDeployFiles.ExcludedFromBuild)' != 'true'">
+        <Source>@(CopyDeployFiles, '|')</Source>
+      </CopyDeployFiles_tlog>
+    </ItemGroup>
+    <Message
+      Importance="High"
+      Text="%(CopyDeployFiles.ExecutionDescription)" />
+    <WriteLinesToFile
+      Condition="'@(CopyDeployFiles_tlog)' != '' and '%(CopyDeployFiles_tlog.ExcludedFromBuild)' != 'true'"
+      File="$(IntDir)$(ProjectName).write.1.tlog"
+      Lines="^%(CopyDeployFiles_tlog.Source);@(CopyDeployFiles_tlog-&gt;'%(Fullpath)')" />
+    <CopyDeployFiles
+      Condition="'@(CopyDeployFiles)' != '' and '%(CopyDeployFiles.ExcludedFromBuild)' != 'true'"
+      CommandLineTemplate="%(CopyDeployFiles.CommandLineTemplate)"
+      AdditionalOptions="%(CopyDeployFiles.AdditionalOptions)"
+      Inputs="%(CopyDeployFiles.Identity)" />
+  </Target>
+  <PropertyGroup>
+    <ComputeLinkInputsTargets>
+            $(ComputeLinkInputsTargets);
+            ComputeCopyDeployFilesOutput;
+          </ComputeLinkInputsTargets>
+    <ComputeLibInputsTargets>
+            $(ComputeLibInputsTargets);
+            ComputeCopyDeployFilesOutput;
+          </ComputeLibInputsTargets>
+  </PropertyGroup>
+  <Target
+    Name="ComputeCopyDeployFilesOutput"
+    Condition="'@(CopyDeployFiles)' != ''">
+    <ItemGroup>
+      <CopyDeployFilesDirsToMake
+        Condition="'@(CopyDeployFiles)' != '' and '%(CopyDeployFiles.ExcludedFromBuild)' != 'true'"
+        Include="%(CopyDeployFiles.Outputs)" />
+    </ItemGroup>
+    <MakeDir
+      Directories="@(CopyDeployFilesDirsToMake-&gt;'%(RootDir)%(Directory)')" />
+  </Target>
+  <Target
+    Name="_CopyDeployFolders"
+    BeforeTargets="$(CopyDeployFoldersBeforeTargets)"
+    AfterTargets="$(CopyDeployFoldersAfterTargets)"
+    Condition="'@(CopyDeployFolders)' != ''"
+    DependsOnTargets="$(CopyDeployFoldersDependsOn);ComputeCopyDeployFoldersOutput"
+    Outputs="%(CopyDeployFolders.Outputs)"
+    Inputs="%(CopyDeployFolders.Identity);%(CopyDeployFolders.AdditionalDependencies);$(MSBuildProjectFile)">
+    <ItemGroup
+      Condition="'@(SelectedFiles)' != ''">
+      <CopyDeployFolders
+        Remove="@(CopyDeployFolders)"
+        Condition="'%(Identity)' != '@(SelectedFiles)'" />
+    </ItemGroup>
+    <ItemGroup>
+      <CopyDeployFolders_tlog
+        Include="%(CopyDeployFolders.Outputs)"
+        Condition="'%(CopyDeployFolders.Outputs)' != '' and '%(CopyDeployFolders.ExcludedFromBuild)' != 'true'">
+        <Source>@(CopyDeployFolders, '|')</Source>
+      </CopyDeployFolders_tlog>
+    </ItemGroup>
+    <Message
+      Importance="High"
+      Text="%(CopyDeployFolders.ExecutionDescription)" />
+    <WriteLinesToFile
+      Condition="'@(CopyDeployFolders_tlog)' != '' and '%(CopyDeployFolders_tlog.ExcludedFromBuild)' != 'true'"
+      File="$(IntDir)$(ProjectName).write.1.tlog"
+      Lines="^%(CopyDeployFolders_tlog.Source);@(CopyDeployFolders_tlog-&gt;'%(Fullpath)')" />
+    <CopyDeployFolders
+      Condition="'@(CopyDeployFolders)' != '' and '%(CopyDeployFolders.ExcludedFromBuild)' != 'true'"
+      CommandLineTemplate="%(CopyDeployFolders.CommandLineTemplate)"
+      AdditionalOptions="%(CopyDeployFolders.AdditionalOptions)"
+      Inputs="%(CopyDeployFolders.Identity)" />
+  </Target>
+  <PropertyGroup>
+    <ComputeLinkInputsTargets>
+            $(ComputeLinkInputsTargets);
+            ComputeCopyDeployFoldersOutput;
+          </ComputeLinkInputsTargets>
+    <ComputeLibInputsTargets>
+            $(ComputeLibInputsTargets);
+            ComputeCopyDeployFoldersOutput;
+          </ComputeLibInputsTargets>
+  </PropertyGroup>
+  <Target
+    Name="ComputeCopyDeployFoldersOutput"
+    Condition="'@(CopyDeployFolders)' != ''">
+    <ItemGroup>
+      <CopyDeployFoldersDirsToMake
+        Condition="'@(CopyDeployFolders)' != '' and '%(CopyDeployFolders.ExcludedFromBuild)' != 'true'"
+        Include="%(CopyDeployFolders.Outputs)" />
+    </ItemGroup>
+    <MakeDir
+      Directories="@(CopyDeployFoldersDirsToMake-&gt;'%(RootDir)%(Directory)')" />
+  </Target>
+</Project>
