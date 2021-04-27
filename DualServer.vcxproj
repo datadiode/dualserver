@@ -95,6 +95,7 @@
     <ClCompile Include="EASTL\src\hashtable.cpp" />
     <ClCompile Include="EASTL\src\red_black_tree.cpp" />
     <ClCompile Include="EASTL\src\string.cpp" />
+    <ClCompile Include="TelnetHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="convert_utf\ConvertUTF.h" />
@@ -104,6 +105,7 @@
     <ClInclude Include="LeakDetector.h" />
     <ClInclude Include="punycode\punycode.h" />
     <ClInclude Include="PunyConvert.h" />
+    <ClInclude Include="TelnetHandler.h" />
   </ItemGroup>
   <ItemGroup>
     <CopyDeployFiles Include="DualServer.ini.CopyDeploy" />

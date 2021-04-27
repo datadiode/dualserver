@@ -60,6 +60,9 @@
     <ClCompile Include="EASTL\src\string.cpp">
       <Filter>EASTL</Filter>
     </ClCompile>
+    <ClCompile Include="TelnetHandler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="convert_utf\ConvertUTF.h">
@@ -83,6 +86,9 @@
     <ClInclude Include="PunyConvert.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="TelnetHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CopyDeployFiles Include="DualServer.ini.CopyDeploy">
@@ -93,5 +99,8 @@
     <CopyDeployFolders Include="log.CopyDeployFolder">
       <Filter>CopyDeploy</Filter>
     </CopyDeployFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include=".git\FETCH_HEAD" />
   </ItemGroup>
 </Project>

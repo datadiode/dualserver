@@ -1,0 +1,1 @@
+bool AcceptTelnetConnection(SOCKET selected);

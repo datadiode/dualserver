@@ -32,6 +32,7 @@
 #include "LeakDetector.h"
 #include "DualServer.h"
 #include "HttpHandler.h"
+#include "TelnetHandler.h"
 #include "gen-versioninfo.h"
 
 const char sVersion[] = "Dual DHCP DNS Server Version " GEN_VER_VERSION_STRING;
@@ -66,6 +67,7 @@ const char arpa[] = ".in-addr.arpa";
 const char ip6arpa[] = ".ip6.arpa";
 bool dhcpService = true;
 bool dnsService = true;
+bool telnetService = false;
 time_t t = time(NULL);
 HANDLE lEvent;
 
@@ -258,6 +260,12 @@ void closeConn()
 {
 	if (network.httpConn.ready)
 		closesocket(network.httpConn.sock);
+
+	if (telnetService)
+	{
+		if (network.telnetConn.ready)
+			closesocket(network.telnetConn.sock);
+	}
 
     if (dhcpService)
     {
@@ -485,10 +493,24 @@ void __cdecl serverloop(void *)
 				FD_SET(network.forwConn.sock, &readfds);
 		}
 
+		if (telnetService)
+		{
+			if (network.telnetConn.ready)
+				FD_SET(network.telnetConn.sock, &readfds);
+		}
+
 		if (select(network.maxFD, &readfds, NULL, NULL, &tv))
 		{
 			t = time(NULL);
 			network.busy = true;
+
+			if (telnetService)
+			{
+				if (network.telnetConn.ready && FD_ISSET(network.telnetConn.sock, &readfds))
+				{
+					AcceptTelnetConnection(network.telnetConn.sock);
+				}
+			}
 
 			if (dhcpService)
 			{
@@ -7113,6 +7135,8 @@ int runProg()
 				dnsService = true;
 			else if (!strcasecmp(raw, "DHCP"))
 				dhcpService = true;
+			else if (!strcasecmp(raw, "TELNET"))
+				telnetService = true;
 			else
 			{
 				sprintf(logBuff, "Section [SERVICES] invalid entry %s ignored", raw);
@@ -8352,6 +8376,123 @@ int runProg()
 
 						if (network.httpConn.sock > network.maxFD)
 							network.maxFD = network.httpConn.sock;
+					}
+				}
+			}
+		}
+
+		if (telnetService)
+		{
+			network.telnetConn.port = 23;
+			network.telnetConn.server = inet_addr("127.0.0.1");
+			network.telnetConn.loaded = true;
+
+			if (FILE *f = findSection("TELNET_INTERFACE", ff))
+			{
+				for (FILE *e = f; (e = readSection(raw, e, f)) != NULL; )
+				{
+					mySplit(name, value, raw, '=');
+
+					if (!strcasecmp(name, "TelnetServer"))
+					{
+						mySplit(name, value, value, ':');
+
+						if (isIP(name))
+						{
+							network.telnetConn.loaded = true;
+							network.telnetConn.server = inet_addr(name);
+						}
+						else
+						{
+							network.telnetConn.loaded = false;
+							sprintf(logBuff, "Warning: Section [TELNET_INTERFACE], Invalid IP Address %s, ignored", name);
+							logDHCPMess(logBuff, 1);
+						}
+
+						if (value[0])
+						{
+							if (MYWORD port = static_cast<MYWORD>(atoi(value)))
+								network.telnetConn.port = port;
+							else
+							{
+								network.telnetConn.loaded = false;
+								sprintf(logBuff, "Warning: Section [TELNET_INTERFACE], Invalid port %s, ignored", value);
+								logDHCPMess(logBuff, 1);
+							}
+						}
+
+						if (network.telnetConn.server != inet_addr("127.0.0.1") && !findServer(network.allServers, MAX_SERVERS, network.telnetConn.server))
+						{
+							bindfailed = true;
+							network.telnetConn.loaded = false;
+							sprintf(logBuff, "Warning: Section [TELNET_INTERFACE], %s not available, ignored", raw);
+							logDHCPMess(logBuff, 1);
+						}
+					}
+					else if (!strcasecmp(name, "TelnetClient"))
+					{
+						if (isIP(value))
+							addServer(cfig.telnetClients, 8, inet_addr(value));
+						else
+						{
+							sprintf(logBuff, "Warning: Section [TELNET_INTERFACE], invalid client IP %s, ignored", raw);
+							logDHCPMess(logBuff, 1);
+						}
+					}
+					else
+					{
+						sprintf(logBuff, "Warning: Section [TELNET_INTERFACE], invalid entry %s, ignored", raw);
+						logDHCPMess(logBuff, 1);
+					}
+				}
+				rewind(ff);
+			}
+
+			network.telnetConn.sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+			if (network.telnetConn.sock == INVALID_SOCKET)
+			{
+				bindfailed = true;
+				sprintf(logBuff, "Failed to Create Socket for Telnet");
+				logDHCPMess(logBuff, 1);
+			}
+			else
+			{
+				//printf("Socket %u\n", network.telnetConn.sock);
+
+				network.telnetConn.addr.sin_family = AF_INET;
+				network.telnetConn.addr.sin_addr.s_addr = network.telnetConn.server;
+				network.telnetConn.addr.sin_port = htons(network.telnetConn.port);
+
+				int nRet = bind(network.telnetConn.sock,
+								(sockaddr*)&network.telnetConn.addr,
+								sizeof(struct sockaddr_in));
+
+				if (nRet == SOCKET_ERROR)
+				{
+					bindfailed = true;
+					sprintf(logBuff, "Telnet Interface %s TCP Port %u not available", IP2String(network.telnetConn.server), network.telnetConn.port);
+					logDHCPMess(logBuff, 1);
+					closesocket(network.telnetConn.sock);
+				}
+				else
+				{
+					nRet = listen(network.telnetConn.sock, SOMAXCONN);
+
+					if (nRet == SOCKET_ERROR)
+					{
+						bindfailed = true;
+						sprintf(logBuff, "%s TCP Port %u Error on Listen", IP2String(network.telnetConn.server), network.telnetConn.port);
+						logDHCPMess(logBuff, 1);
+						closesocket(network.telnetConn.sock);
+					}
+					else
+					{
+						network.telnetConn.loaded = true;
+						network.telnetConn.ready = true;
+
+						if (network.telnetConn.sock > network.maxFD)
+							network.maxFD = network.telnetConn.sock;
 					}
 				}
 			}

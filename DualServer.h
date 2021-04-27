@@ -632,6 +632,7 @@ struct data1
 	ConnType forwConn;
 	ConnType dnsTcpConn[MAX_SERVERS];
 	ConnType httpConn;
+	ConnType telnetConn;
 	MYDWORD allServers[MAX_SERVERS];
 	MYDWORD listenServers[MAX_SERVERS];
 	MYDWORD listenMasks[MAX_SERVERS];
@@ -677,6 +678,7 @@ struct data2
 	MYDWORD dhcpSize;
 	time_t expireTime;
 	MYDWORD httpClients[8];
+	MYDWORD telnetClients[8];
 	MYDWORD zoneServers[MAX_TCP_CLIENTS];
 	data6 dnsRoutes[MAX_COND_FORW];
 	data16 wildHosts[MAX_WILD_HOSTS];
