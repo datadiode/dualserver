@@ -41,7 +41,7 @@ static void __cdecl telnetThread(void *pv)
 		GetEnvironmentVariable(TEXT("COMSPEC"), path, _countof(path)) &&
 		CreateProcess(NULL, path, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi))
 	{
-		logDHCPMess("Started command shell", 1);
+		sprintf(logDHCP<1>(), "Started command shell");
 		DWORD wait;
 		do
 		{
@@ -62,8 +62,7 @@ static void __cdecl telnetThread(void *pv)
 					}
 					else if (result == 0 || (result = WSAGetLastError()) != WSAEWOULDBLOCK)
 					{
-						wsprintf(buffer, "Send error due to %d", result);
-						logDHCPMess(buffer, 1);
+						sprintf(logDHCP<1>(), "Send error due to %d", result);
 						break;
 					}
 				}
@@ -74,8 +73,7 @@ static void __cdecl telnetThread(void *pv)
 			}
 			else if (result == 0 || (result = WSAGetLastError()) != WSAEWOULDBLOCK)
 			{
-				wsprintf(buffer, "Premature exit due to %d", result);
-				logDHCPMess(buffer, 1);
+				sprintf(logDHCP<1>(), "Premature exit due to %d", result);
 				break;
 			}
 		} while (wait == WAIT_TIMEOUT);
@@ -95,31 +93,36 @@ static void __cdecl telnetThread(void *pv)
 	}
 
 	closesocket(client);
-	logDHCPMess("Disconnected", 1);
+	sprintf(logDHCP<1>(), "Disconnected");
 	EndThread();
 }
 
 bool AcceptTelnetConnection(SOCKET selected)
 {
-	char logBuff[1024];
 	SOCKADDR_IN remote;
 	socklen_t sockLen = sizeof remote;;
-	SOCKET client = accept(selected, (sockaddr*)&remote, &sockLen);
+	SOCKET client = accept(selected, reinterpret_cast<sockaddr*>(&remote), &sockLen);
 	if (client != INVALID_SOCKET)
 	{
-		sprintf(logBuff, "Client %s, Telnet Request Received", IP2String(remote.sin_addr.s_addr));
-		logDHCPMess(logBuff, 2);
-		if (!cfig.telnetClients[0] || findServer(cfig.telnetClients, 8, remote.sin_addr.s_addr))
-			if (BeginThread(telnetThread, 0, reinterpret_cast<void *>(client)))
-				return true;
-		sprintf(logBuff, "Client %s, Telnet Access Denied", IP2String(remote.sin_addr.s_addr));
-		logDHCPMess(logBuff, 2);
+		sprintf(logDHCP<2>(), "Client %s, Telnet Request Received", IP2String(remote.sin_addr.s_addr));
+		if (cfig.telnetClients[0] && !findServer(cfig.telnetClients, 8, remote.sin_addr.s_addr))
+		{
+			sprintf(logDHCP<2>(), "Client %s, Telnet Access Denied", IP2String(remote.sin_addr.s_addr));
+		}
+		else if (!BeginThread(telnetThread, 0, reinterpret_cast<void *>(client)))
+		{
+			sprintf(logDHCP<1>(), "Thread Creation Failed");
+		}
+		else
+		{
+			return true;
+		}
 		closesocket(client);
 	}
 	else
 	{
-		sprintf(logBuff, "Accept Failed, WSAError %u", WSAGetLastError());
-		logDHCPMess(logBuff, 1);
+		int error = WSAGetLastError();
+		sprintf(logDHCP<1>(), "Accept Failed, WSAError %u", error);
 	}
 	return false;
 }
