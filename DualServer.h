@@ -834,3 +834,12 @@ MYWORD scanloc(data5*);
 int sdnmess(data5*);
 int sendTCPmess(data5 *req);
 
+template<MYBYTE level>
+class logDHCP
+{
+	char buf[1024];
+public:
+	logDHCP() { buf[0] = '\0'; }
+	~logDHCP() { logDHCPMess(buf, level); }
+	operator char *() { return buf; }
+};

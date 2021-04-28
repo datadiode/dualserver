@@ -1,24 +1,6 @@
-/**************************************************************************
-*   Copyright (C) 2005 by Achal Dhir                                      *
-*   achaldhir@gmail.com                                                   *
-*                                                                         *
-*   This program is free software; you can redistribute it and/or modify  *
-*   it under the terms of the GNU General Public License as published by  *
-*   the Free Software Foundation; either version 2 of the License, or     *
-*   (at your option) any later version.                                   *
-*                                                                         *
-*   This program is distributed in the hope that it will be useful,       *
-*   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
-*   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
-*   GNU General Public License for more details.                          *
-*                                                                         *
-*   You should have received a copy of the GNU General Public License     *
-*   along with this program; if not, write to the                         *
-*   Free Software Foundation, Inc.,                                       *
-*   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
-***************************************************************************/
 // HttpHandler.cpp
-// Last change: 2013-10-20 by Jochen Neubeck
+// Copyright (C) 2005 by Achal Dhir
+// SPDX-License-Identifier: GPL-2.0-or-later
 #include <stdio.h>
 #include <winsock2.h>
 #include <time.h>
@@ -86,14 +68,12 @@ char HttpHandler::htmlTitle[512];
 
 HttpHandler::HttpHandler(SOCKET selected)
 {
-	char logBuff[1024];
 	sockLen = sizeof remote;
 	sock = accept(selected, (sockaddr*)&remote, &sockLen);
 	if (sock == INVALID_SOCKET)
 	{
 		int error = WSAGetLastError();
-		sprintf(logBuff, "Accept Failed, WSAError %u", error);
-		logDHCPMess(logBuff, 1);
+		sprintf(logDHCP<1>(), "Accept Failed, WSAError %u", error);
 		delete this;
 		return;
 	}
@@ -103,7 +83,7 @@ HttpHandler::HttpHandler(SOCKET selected)
 	setsockopt(sock, SOL_SOCKET, SO_LINGER, (const char*)&ling, sizeof ling);
 
 	timeval tv1;
-	tv1.tv_sec = 1;
+	tv1.tv_sec = 5;
 	tv1.tv_usec = 0;
 
 	fd_set readfds1;
@@ -119,21 +99,18 @@ HttpHandler::HttpHandler(SOCKET selected)
 	if (bytes <= 0)
 	{
 		int error = WSAGetLastError();
-		sprintf(logBuff, "Client %s, HTTP Message Receive failed, WSAError %d", IP2String(remote.sin_addr.s_addr), error);
-		logDHCPMess(logBuff, 1);
+		sprintf(logDHCP<1>(), "Client %s, HTTP Message Receive failed, WSAError %d", IP2String(remote.sin_addr.s_addr), error);
 		closesocket(sock);
 		delete this;
 		return;
 	}
 
-	sprintf(logBuff, "Client %s, HTTP Request Received", IP2String(remote.sin_addr.s_addr));
-	logDHCPMess(logBuff, 2);
+	sprintf(logDHCP<2>(), "Client %s, HTTP Request Received", IP2String(remote.sin_addr.s_addr));
 
 	if (cfig.httpClients[0] && !findServer(cfig.httpClients, 8, remote.sin_addr.s_addr))
 	{
 		fp.cancel(send403);
-		sprintf(logBuff, "Client %s, HTTP Access Denied", IP2String(remote.sin_addr.s_addr));
-		logDHCPMess(logBuff, 2);
+		sprintf(logDHCP<2>(), "Client %s, HTTP Access Denied", IP2String(remote.sin_addr.s_addr));
 	}
 	else try
 	{
@@ -155,23 +132,26 @@ HttpHandler::HttpHandler(SOCKET selected)
 			fp.cancel(send404);
 			if (*url != '\0')
 			{
-				sprintf(logBuff, "Client %s, %.100s not found", IP2String(remote.sin_addr.s_addr), url);
-				logDHCPMess(logBuff, 2);
+				sprintf(logDHCP<2>(), "Client %s, %.100s not found", IP2String(remote.sin_addr.s_addr), url);
 			}
 			else
 			{
-				sprintf(logBuff, "Client %s, Invalid http request", IP2String(remote.sin_addr.s_addr));
-				logDHCPMess(logBuff, 2);
+				sprintf(logDHCP<2>(), "Client %s, Invalid http request", IP2String(remote.sin_addr.s_addr));
 			}
 		}
 	}
 	catch (std::bad_alloc)
 	{
 		fp.cancel(send507);
-		sprintf(logBuff, "Memory Error");
-		logDHCPMess(logBuff, 1);
+		sprintf(logDHCP<1>(), "Memory Error");
 	}
-	BeginThread(sendThread, 0, this);
+
+	if (!BeginThread(sendThread, 0, this))
+	{
+		sprintf(logDHCP<1>(), "Thread Creation Failed");
+		closesocket(sock);
+		delete this;
+	}
 }
 
 void HttpHandler::sendStatus()
