@@ -51,29 +51,23 @@ static void __cdecl telnetThread(void *pv)
 			char buffer[4096];
 			while (PeekNamedPipe(output[read], buffer, sizeof buffer, &cb, NULL, NULL) && cb != 0)
 			{
-				ReadFile(output[read], buffer, cb, &cb, NULL);
-				char *p = buffer;
-				while (cb != 0)
+				if ((result = send(client, buffer, cb, 0)) > 0)
 				{
-					if ((result = send(client, p, cb, 0)) > 0)
-					{
-						p += result;
-						cb -= result;
-					}
-					else if (result == 0 || (result = WSAGetLastError()) != WSAEWOULDBLOCK)
-					{
-						sprintf(logDHCP<1>(), "Send error due to %d", result);
-						break;
-					}
+					ReadFile(output[read], buffer, result, &cb, NULL);
+				}
+				else if (result < 0 && (result = WSAGetLastError()) != WSAEWOULDBLOCK)
+				{
+					sprintf(logDHCP<1>(), "Send error due to %d", result);
+					break;
 				}
 			}
 			if ((result = recv(client, buffer, sizeof buffer, 0)) > 0)
 			{
 				WriteFile(input[write], buffer, result, &cb, NULL);
 			}
-			else if (result == 0 || (result = WSAGetLastError()) != WSAEWOULDBLOCK)
+			else if (result < 0 && (result = WSAGetLastError()) != WSAEWOULDBLOCK)
 			{
-				sprintf(logDHCP<1>(), "Premature exit due to %d", result);
+				sprintf(logDHCP<1>(), "Receive error due to %d", result);
 				break;
 			}
 		} while (wait == WAIT_TIMEOUT);
