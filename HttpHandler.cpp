@@ -93,7 +93,7 @@ HttpHandler::HttpHandler(SOCKET selected)
 	char buffer[1024];
 
 	int bytes = -1;
-	if (select(sock + 1, &readfds1, NULL, NULL, &tv1))
+	if (select(0, &readfds1, NULL, NULL, &tv1))
 		bytes = recv(sock, buffer, sizeof buffer - 1, 0);
 
 	if (bytes <= 0)
@@ -380,7 +380,7 @@ bool HttpHandler::send(const char *dp, HttpResponse::size_type bytes)
 	FD_ZERO(&writefds);
 	FD_SET(sock, &writefds);
 
-	if (::select(sock + 1, NULL, &writefds, NULL, &tv) <= 0)
+	if (::select(0, NULL, &writefds, NULL, &tv) <= 0)
 		return false;
 	if (::send(sock, dp, bytes, 0) <= 0)
 		return false;

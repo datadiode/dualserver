@@ -499,7 +499,7 @@ void __cdecl serverloop(void *)
 				FD_SET(network.telnetConn.sock, &readfds);
 		}
 
-		if (select(network.maxFD, &readfds, NULL, NULL, &tv))
+		if (select(0, &readfds, NULL, NULL, &tv))
 		{
 			t = time(NULL);
 			network.busy = true;
@@ -6275,7 +6275,7 @@ MYDWORD getSerial(const char *zone)
 	FD_ZERO(&readfds1);
 	FD_SET(req.sock, &readfds1);
 
-	select(USHRT_MAX, &readfds1, NULL, NULL, &tv1);
+	select(0, &readfds1, NULL, NULL, &tv1);
 
 	if (FD_ISSET(req.sock, &readfds1))
 	{
@@ -6351,7 +6351,7 @@ MYDWORD getSerial(const char *zone)
 	tv1.tv_sec = 5;
 	tv1.tv_usec = 0;
 	FD_SET(req.sock, &readfds1);
-	select(USHRT_MAX, &readfds1, NULL, NULL, &tv1);
+	select(0, &readfds1, NULL, NULL, &tv1);
 
 	if (FD_ISSET(req.sock, &readfds1))
 	{
@@ -6378,7 +6378,7 @@ int recvTcpDnsMess(char *target, SOCKET sock, int targetSize)
 	FD_ZERO(&readfds1);
 	FD_SET(sock, &readfds1);
 
-	if (select(sock + 1, &readfds1, NULL, NULL, &tv1))
+	if (select(0, &readfds1, NULL, NULL, &tv1))
 	{
 		int chunk = recv(sock, target, 2, 0);
 
@@ -6398,7 +6398,7 @@ int recvTcpDnsMess(char *target, SOCKET sock, int targetSize)
 				tv1.tv_sec = 5;
 				tv1.tv_usec = 0;
 
-				if (select(sock + 1, &readfds1, NULL, NULL, &tv1))
+				if (select(0, &readfds1, NULL, NULL, &tv1))
 				{
 					ptr = target + rcd;
 					chunk = recv(sock, ptr, bytes - rcd, 0);
