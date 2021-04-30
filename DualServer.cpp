@@ -8122,9 +8122,6 @@ int runProg()
 
 		getInterfaces(ff);
 
-		if (network.maxFD < cfig.dhcpReplConn.sock)
-			network.maxFD = cfig.dhcpReplConn.sock;
-
 		bool ifSpecified = false;
 		bool bindfailed = false;
 
@@ -8244,9 +8241,6 @@ int runProg()
 
 				network.dhcpConn[i].loaded = true;
 				network.dhcpConn[i].ready = true;
-
-				if (network.maxFD < network.dhcpConn[i].sock)
-					network.maxFD = network.dhcpConn[i].sock;
 
 				network.dhcpConn[i].server = network.listenServers[j];
 				network.dhcpConn[i].mask = network.listenMasks[j];
@@ -8373,9 +8367,6 @@ int runProg()
 					{
 						network.httpConn.loaded = true;
 						network.httpConn.ready = true;
-
-						if (network.httpConn.sock > network.maxFD)
-							network.maxFD = network.httpConn.sock;
 					}
 				}
 			}
@@ -8490,9 +8481,6 @@ int runProg()
 					{
 						network.telnetConn.loaded = true;
 						network.telnetConn.ready = true;
-
-						if (network.telnetConn.sock > network.maxFD)
-							network.maxFD = network.telnetConn.sock;
 					}
 				}
 			}
@@ -8537,9 +8525,6 @@ int runProg()
 				network.dnsUdpConn[i].loaded = true;
 				network.dnsUdpConn[i].ready = true;
 
-				if (network.maxFD < network.dnsUdpConn[i].sock)
-					network.maxFD = network.dnsUdpConn[i].sock;
-
 				network.dnsUdpConn[i].server = network.listenServers[j];
 				network.dnsUdpConn[i].port = IPPORT_DNS;
 
@@ -8563,9 +8548,6 @@ int runProg()
 
 				network.forwConn.loaded = true;
 				network.forwConn.ready = true;
-
-				if (network.maxFD < network.forwConn.sock)
-					network.maxFD = network.forwConn.sock;
 			}
 
 			i = 0;
@@ -8616,17 +8598,12 @@ int runProg()
 							network.dnsTcpConn[i].loaded = true;
 							network.dnsTcpConn[i].ready = true;
 
-							if (network.maxFD < network.dnsTcpConn[i].sock)
-								network.maxFD = network.dnsTcpConn[i].sock;
-
 							++i;
 						}
 					}
 				}
 			}
 		}
-
-		++network.maxFD;
 
 		if (dhcpService)
 		{
@@ -8668,6 +8645,12 @@ int runProg()
 				fprintf(f, "<html><body><h2>DHCP/HTTP Service is not running</h2></body></html>");
 				fclose(f);
 			}
+		}
+
+		if (telnetService && network.telnetConn.ready)
+		{
+			sprintf(logBuff, "Telnet Service Address: %s:%u", IP2String(network.telnetConn.server), network.telnetConn.port);
+			logDHCPMess(logBuff, 1);
 		}
 
 		for (int i = 0; i < MAX_SERVERS && network.staticServers[i]; i++)

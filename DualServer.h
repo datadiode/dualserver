@@ -640,7 +640,6 @@ struct data1
 	MYDWORD staticMasks[MAX_SERVERS];
 	MYDWORD dns[MAX_SERVERS];
 	char encoding[MAX_SERVERS]; // (u)tf-8 or (p)unycode
-	SOCKET maxFD;
 	MYBYTE currentDNS;
 	bool ready;
 	bool busy;

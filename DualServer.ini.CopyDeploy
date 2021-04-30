@@ -209,7 +209,7 @@ hägar-der-schreckliche=192.168.2.100
 
 [HTTP_INTERFACE]
 #This is http inerface for viewing lease status,
-#Default is first interface, port 6789
+#Default is localhost, port 6789
 #You can change it here to any network interface.
 ;HTTPServer=192.168.1.254:6789
 #Also to limit the clients access, you can specify upto 8
@@ -220,7 +220,7 @@ hägar-der-schreckliche=192.168.2.100
 
 [TELNET_INTERFACE]
 #This is Telnet inerface for remoting a command shell,
-#Default is first interface, port 23
+#Default is localhost, port 23
 #You can change it here to any network interface.
 ;TelnetServer=192.168.1.254:23
 #Also to limit the clients access, you can specify upto 8
