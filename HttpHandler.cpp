@@ -1,5 +1,5 @@
 // HttpHandler.cpp
-// Copyright (C) 2005 by Achal Dhir
+// Copyright (C) 2005-2021 Achal Dhir et al.
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <stdio.h>
 #include <winsock2.h>
