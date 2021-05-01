@@ -41,7 +41,7 @@ static void __cdecl telnetThread(void *pv)
 		GetEnvironmentVariable(TEXT("COMSPEC"), path, _countof(path)) &&
 		CreateProcess(NULL, path, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi))
 	{
-		sprintf(logDHCP<1>(), "Started command shell");
+		sprintf(logTelnet<1>(), "Started command shell");
 		DWORD wait;
 		do
 		{
@@ -57,7 +57,7 @@ static void __cdecl telnetThread(void *pv)
 				}
 				else if (result < 0 && (result = WSAGetLastError()) != WSAEWOULDBLOCK)
 				{
-					sprintf(logDHCP<1>(), "Send error due to %d", result);
+					sprintf(logTelnet<1>(), "Send error due to %d", result);
 					break;
 				}
 			}
@@ -67,7 +67,7 @@ static void __cdecl telnetThread(void *pv)
 			}
 			else if (result < 0 && (result = WSAGetLastError()) != WSAEWOULDBLOCK)
 			{
-				sprintf(logDHCP<1>(), "Receive error due to %d", result);
+				sprintf(logTelnet<1>(), "Receive error due to %d", result);
 				break;
 			}
 		} while (wait == WAIT_TIMEOUT);
@@ -87,7 +87,7 @@ static void __cdecl telnetThread(void *pv)
 	}
 
 	closesocket(client);
-	sprintf(logDHCP<1>(), "Disconnected");
+	sprintf(logTelnet<1>(), "Disconnected");
 	EndThread();
 }
 
@@ -98,14 +98,14 @@ bool AcceptTelnetConnection(SOCKET selected)
 	SOCKET client = accept(selected, reinterpret_cast<sockaddr*>(&remote), &sockLen);
 	if (client != INVALID_SOCKET)
 	{
-		sprintf(logDHCP<2>(), "Client %s, Telnet Request Received", IP2String(remote.sin_addr.s_addr));
+		sprintf(logTelnet<2>(), "Client %s, Telnet Request Received", IP2String(remote.sin_addr.s_addr));
 		if (cfig.telnetClients[0] && !findServer(cfig.telnetClients, 8, remote.sin_addr.s_addr))
 		{
-			sprintf(logDHCP<2>(), "Client %s, Telnet Access Denied", IP2String(remote.sin_addr.s_addr));
+			sprintf(logTelnet<2>(), "Client %s, Telnet Access Denied", IP2String(remote.sin_addr.s_addr));
 		}
 		else if (!BeginThread(telnetThread, 0, reinterpret_cast<void *>(client)))
 		{
-			sprintf(logDHCP<1>(), "Thread Creation Failed");
+			sprintf(logTelnet<1>(), "Thread Creation Failed");
 		}
 		else
 		{
@@ -116,7 +116,7 @@ bool AcceptTelnetConnection(SOCKET selected)
 	else
 	{
 		int error = WSAGetLastError();
-		sprintf(logDHCP<1>(), "Accept Failed, WSAError %u", error);
+		sprintf(logTelnet<1>(), "Accept Failed, WSAError %u", error);
 	}
 	return false;
 }

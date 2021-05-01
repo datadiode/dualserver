@@ -454,12 +454,6 @@ void __cdecl serverloop(void *)
 	{
 		network.busy = false;
 
-		if (!network.dhcpConn[0].ready && !network.dnsUdpConn[0].ready)
-		{
-			ServiceSleep(1000);
-			continue;
-		}
-
 		if (!network.ready)
 		{
 			ServiceSleep(1000);
@@ -499,9 +493,10 @@ void __cdecl serverloop(void *)
 				FD_SET(network.telnetConn.sock, &readfds);
 		}
 
-		if (select(0, &readfds, NULL, NULL, &tv))
+		int result = select(0, &readfds, NULL, NULL, &tv);
+		t = time(NULL);
+		if (result)
 		{
-			t = time(NULL);
 			network.busy = true;
 
 			if (telnetService)
@@ -633,8 +628,6 @@ void __cdecl serverloop(void *)
 				}
 			}
 		}
-		else
-			t = time(NULL);
 
 		currentInd = newInd;
 		checkSize(currentInd);
@@ -7057,6 +7050,7 @@ int runProg()
 
 	cfig.dnsLogLevel = 1;
 	cfig.dhcpLogLevel = 1;
+	cfig.telnetLogLevel = 1;
 
 	FILE *ff = fopen(iniFile, "rt");
 	if (ff == NULL)
@@ -7098,6 +7092,17 @@ int runProg()
 						cfig.dhcpLogLevel = 3;
 					else
 						sprintf(tempbuff, "Section [LOGGING], Invalid DHCPLogLevel: %s", value);
+				}
+				else if (!strcasecmp(name, "TelnetLogLevel"))
+				{
+					if (!strcasecmp(value, "None"))
+						cfig.telnetLogLevel = 0;
+					else if (!strcasecmp(value, "Normal"))
+						cfig.telnetLogLevel = 1;
+					else if (!strcasecmp(value, "All"))
+						cfig.telnetLogLevel = 2;
+					else
+						sprintf(tempbuff, "Section [LOGGING], Invalid TelnetLogLevel: %s", value);
 				}
 				else
 					sprintf(tempbuff, "Section [LOGGING], Invalid Entry %s ignored", raw);
@@ -7144,7 +7149,7 @@ int runProg()
 			}
 		}
 
-		if (!dhcpService && !dnsService)
+		if (!dhcpService && !dnsService && !telnetService)
 		{
 			dhcpService = true;
 			dnsService = true;
@@ -8650,7 +8655,7 @@ int runProg()
 		if (telnetService && network.telnetConn.ready)
 		{
 			sprintf(logBuff, "Telnet Service Address: %s:%u", IP2String(network.telnetConn.server), network.telnetConn.port);
-			logDHCPMess(logBuff, 1);
+			logTelnetMess(logBuff, 1);
 		}
 
 		for (int i = 0; i < MAX_SERVERS && network.staticServers[i]; i++)
@@ -9363,6 +9368,12 @@ void logTCPMess(data5 *req, const char *logBuff, MYBYTE logLevel)
 		sprintf(mess, "TCP Client %s, %s", inet_ntoa(req->remote.sin_addr), logBuff);
 		logMess(mess, logLevel);
 	}
+}
+
+void logTelnetMess(const char *mess, MYBYTE logLevel)
+{
+	if (logLevel <= cfig.telnetLogLevel || verbatim)
+		logMess(mess, logLevel);
 }
 
 data7 *createCache(const data71 *lump)

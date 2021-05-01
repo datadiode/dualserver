@@ -697,6 +697,7 @@ struct data2
 	MYBYTE qc;
 	MYBYTE dhcpLogLevel;
 	MYBYTE dnsLogLevel;
+	MYBYTE telnetLogLevel;
 	MYBYTE authorized;
 	MYBYTE replication;
 };
@@ -802,6 +803,7 @@ void logDHCPMess(const char*, MYBYTE);
 void logDNSMess(const char*, MYBYTE);
 void logDNSMess(data5*, const char*, MYBYTE);
 void logTCPMess(data5*, const char*, MYBYTE);
+void logTelnetMess(const char*, MYBYTE);
 bool mySplit(char*, char*, const char*, char);
 void sendToken();
 void procTCP(data5*);
@@ -833,12 +835,15 @@ MYWORD scanloc(data5*);
 int sdnmess(data5*);
 int sendTCPmess(data5 *req);
 
-template<MYBYTE level>
-class logDHCP
+template<MYBYTE level, void (*write)(const char *mess, MYBYTE logLevel)>
+class logBuff
 {
 	char buf[1024];
 public:
-	logDHCP() { buf[0] = '\0'; }
-	~logDHCP() { logDHCPMess(buf, level); }
+	logBuff() { buf[0] = '\0'; }
+	~logBuff() { write(buf, level); }
 	operator char *() { return buf; }
 };
+
+template<MYBYTE level> class logDHCP : public logBuff<level, logDHCPMess> { };
+template<MYBYTE level> class logTelnet : public logBuff<level, logTelnetMess> { };
