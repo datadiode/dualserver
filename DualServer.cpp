@@ -7083,6 +7083,8 @@ int runProg()
 						cfig.telnetLogLevel = 1;
 					else if (!strcasecmp(value, "All"))
 						cfig.telnetLogLevel = 2;
+					else if (!strcasecmp(value, "Console"))
+						cfig.telnetLogLevel = 255;
 					else
 						sprintf(tempbuff, "Section [LOGGING], Invalid TelnetLogLevel: %s", value);
 				}
@@ -9264,6 +9266,9 @@ void logMessVerbatim(const char *mess)
 
 void logMessArchived(const char *mess)
 {
+	if (logFile[0] == '\0')
+		return;
+
 	tm *ttm = localtime(&t);
 	char path[_MAX_PATH];
 	strftime(path, sizeof path, logFile, ttm);
@@ -9301,14 +9306,13 @@ void logMessArchived(const char *mess)
 	}
 	else
 	{
-		cfig.dnsLogLevel = 0;
-		cfig.dhcpLogLevel = 0;
+		logFile[0] = '\0';
 	}
 }
 
 void logMess(const char *mess, MYBYTE logLevel)
 {
-	bool archived = logLevel <= cfig.dnsLogLevel || logLevel <= cfig.dhcpLogLevel;
+	bool archived = logLevel <= cfig.dnsLogLevel || logLevel <= cfig.dhcpLogLevel || logLevel <= cfig.telnetLogLevel;
 	if (archived || verbatim)
 	{
 		WaitForSingleObject(lEvent, INFINITE);

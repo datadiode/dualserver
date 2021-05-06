@@ -54,6 +54,10 @@ static void __cdecl telnetThread(void *pv)
 				if ((result = send(client, buffer, cb, 0)) > 0)
 				{
 					ReadFile(output[read], buffer, result, &cb, NULL);
+					if (cfig.telnetLogLevel == 255)
+					{
+						WriteFile(verbatim, buffer, result, &cb, NULL);
+					}
 				}
 				else if (result < 0 && (result = WSAGetLastError()) != WSAEWOULDBLOCK)
 				{

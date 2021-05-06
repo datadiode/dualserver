@@ -710,6 +710,7 @@ public:
 };
 
 //Global Variables
+extern const HANDLE verbatim;
 extern time_t t;
 extern dhcpMap dhcpCache;
 extern volatile bool kRunning;

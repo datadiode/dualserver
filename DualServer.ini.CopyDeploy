@@ -35,7 +35,7 @@
 #and DHCP Lease renewal messages. Normal is defaul logging also.
 DHCPLogLevel=Debug
 ;DNSLogLevel=Normal
-;TelnetLogLevel=Normal
+;TelnetLogLevel=Console
 
 [DNS_ALLOWED_HOSTS]
 #These are permitted hosts for DNS Query.
